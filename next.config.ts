@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['pdf-parse'],
   experimental: {
     serverActions: {
-      bodySizeLimit: '50mb',
+      bodySizeLimit: '2mb',
       allowedOrigins: undefined, // rely on Next.js default (same-origin only) — explicit for documentation
     },
   },
