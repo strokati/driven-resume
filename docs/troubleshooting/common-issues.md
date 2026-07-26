@@ -153,6 +153,16 @@ Going forward, never use `down -v` unless you specifically want to wipe the volu
 
 ---
 
+### Can't reach Postgres from another machine on my network
+
+**Symptom:** A tool on a different machine (or a different Docker container outside the compose project) can't connect to the dev Postgres on port 5432.
+
+**Cause:** By design — `docker-compose.dev.yml` binds the database port to `127.0.0.1:5432` only. The hardcoded dev credentials (`reeesume`/`reeesume`) are not safe to expose on a LAN.
+
+**Fix:** For local development, connect via `localhost:5432` from the same machine. If you genuinely need to share the dev DB (uncommon), edit `docker-compose.dev.yml` locally and change `127.0.0.1:5432:5432` back to `5432:5432` — but do not commit that change.
+
+---
+
 ## PDF export / Puppeteer
 
 ### PDF export fails with "No usable sandbox"
