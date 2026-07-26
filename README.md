@@ -116,7 +116,7 @@ On first visit, enter your email. A 6-digit OTP is sent to `ALLOWED_EMAIL`. No p
 **Requirements:** Node.js 20+, Docker
 
 ```bash
-# Start database + Mailhog (email catch at http://localhost:8025)
+# Start database + Mailpit (email catch at http://localhost:8025)
 docker compose -f docker-compose.dev.yml up -d
 
 cp .env.example .env

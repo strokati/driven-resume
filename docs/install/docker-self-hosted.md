@@ -158,7 +158,7 @@ If OTP emails don't arrive, see [troubleshooting/common-issues.md](../troublesho
 docker compose logs -f app | grep -iE "smtp|mail|otp"
 ```
 
-For local development with email testing (no real SMTP needed), the project ships a [Mailhog](https://github.com/mailhog/MailHog) sidecar — see `docker-compose.dev.yml` and the [native install guide](native.md).
+For local development with email testing (no real SMTP needed), the project ships a [Mailpit](https://github.com/axllent/mailpit) sidecar — see `docker-compose.dev.yml` and the [native install guide](native.md).
 
 ---
 
