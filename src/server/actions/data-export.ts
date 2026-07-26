@@ -1,7 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, readdir, stat, unlink } from 'fs/promises';
 import path from 'path';
 import { auth } from '@/lib/auth/config';
 import { db } from '@/lib/db/client';
@@ -113,6 +113,34 @@ async function writePreRestoreSnapshot(userId: string): Promise<void> {
   const filename = `pre-restore-${ts}.json`;
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, filename), JSON.stringify(archive, null, 2), 'utf8');
+
+  // Retention: keep only the latest MAX_SNAPSHOTS pre-restore files. Cleanup
+  // is best-effort and never blocks the restore.
+  await pruneSnapshots(dir, MAX_SNAPSHOTS).catch(() => {
+    /* best-effort */
+  });
+}
+
+const MAX_SNAPSHOTS = 5;
+
+async function pruneSnapshots(dir: string, keep: number): Promise<void> {
+  const entries = await readdir(dir);
+  const snapshots = entries
+    .filter((name) => name.startsWith('pre-restore-') && name.endsWith('.json'))
+    .map((name) => path.join(dir, name));
+  if (snapshots.length <= keep) return;
+
+  const stamped = await Promise.all(
+    snapshots.map(async (file) => {
+      const { mtime } = await stat(file);
+      return { file, mtime };
+    })
+  );
+  stamped.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+
+  for (const { file } of stamped.slice(keep)) {
+    await unlink(file).catch(() => {});
+  }
 }
 
 /**
