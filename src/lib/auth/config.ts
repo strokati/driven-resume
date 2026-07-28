@@ -57,6 +57,11 @@ const emailOtpConfig = {
       },
       from: process.env.SMTP_FROM ?? process.env.EMAIL_FROM ?? 'noreply@example.com',
       sendVerificationRequest: async ({ identifier: email }: { identifier: string }) => {
+        // Reject emails outside the allow-list without leaking which emails
+        // are registered. Return early so the request appears identical to
+        // the non-existent-user case.
+        if (email !== process.env.ALLOWED_EMAIL) return;
+
         // Rate limit: 10 OTPs/hour per IP, 5/hour per email. Prevents email
         // bombing and brute-force pressure on the 6-digit space.
         const h = await headers();
@@ -70,8 +75,13 @@ const emailOtpConfig = {
           throw new Error('Too many OTP requests for this email. Try again later.');
         }
 
-        const user = await db.user.findUnique({ where: { email } });
-        if (!user) return;
+        // Bootstrap the User row on first OTP request. The allow-list check
+        // above guarantees only ALLOWED_EMAIL can reach this point.
+        const user = await db.user.upsert({
+          where: { email },
+          update: {},
+          create: { email },
+        });
 
         const code = generateOtp();
         const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
