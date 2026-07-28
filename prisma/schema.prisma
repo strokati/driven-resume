@@ -58,6 +58,19 @@ model OtpCode {
   @@map("otp_codes")
 }
 
+// Required by @auth/prisma-adapter for the Nodemailer magic-link flow.
+// The custom sendVerificationRequest ignores the token (uses OtpCode
+// instead), but the adapter still calls createVerificationToken as part
+// of its standard flow, so the model must exist.
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
 model RateLimit {
   id          String   @id @default(cuid())
   key         String   @unique
