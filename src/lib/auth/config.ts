@@ -43,6 +43,7 @@ assertNextauthSecret();
 const authMode = process.env.AUTH_MODE ?? 'none';
 
 const emailOtpConfig = {
+  trustHost: true,
   adapter: PrismaAdapter(db),
   providers: [
     Nodemailer({
@@ -134,7 +135,7 @@ const emailOtpConfig = {
         httpOnly: true,
         sameSite: 'lax' as const,
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: (process.env.NEXTAUTH_URL ?? '').startsWith('https'),
       },
     },
   },
