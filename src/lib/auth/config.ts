@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import NextAuth from 'next-auth';
+import NextAuth, { type Session } from 'next-auth';
+import type { JWT } from 'next-auth/jwt';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import Nodemailer from 'next-auth/providers/nodemailer';
 import Credentials from 'next-auth/providers/credentials';
@@ -135,7 +136,11 @@ const emailOtpConfig = {
     }),
   ],
   session: {
-    strategy: 'database' as const,
+    // Credentials provider does not trigger adapter.createSession in
+    // Auth.js v5 — database strategy silently drops the session, logging
+    // the user out immediately. JWT strategy keeps the session in a
+    // signed cookie; the adapter is still wired up for future OAuth use.
+    strategy: 'jwt' as const,
     maxAge: Number(process.env.SESSION_DURATION_DAYS ?? 30) * 86400,
   },
   cookies: {
@@ -155,6 +160,19 @@ const emailOtpConfig = {
         return false;
       }
       return true;
+    },
+    // Persist user.id onto the JWT on initial sign-in so the session
+    // callback can expose it. Required for the app's `session.user.id`
+    // reads under the jwt strategy.
+    async jwt({ token, user }: { token: JWT; user?: { id?: string } | null }) {
+      if (user?.id) token.id = user.id;
+      return token;
+    },
+    async session({ session, token }: { session: Session; token: JWT }) {
+      if (token?.id && session.user) {
+        session.user.id = token.id as string;
+      }
+      return session;
     },
   },
 };
