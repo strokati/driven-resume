@@ -204,28 +204,54 @@ function buildMasterResumeCreate(input: LooseRecord, userId: string): LooseRecor
     userId,
     workCompanies: {
       create: (workCompanies as LooseRecord[]).map((company) => {
-        const { roles = [], ...companyScalars } = company;
+        const { roles = [], resumeId: _companyResumeId, ...companyScalars } = company;
+        void _companyResumeId;
         return {
           ...companyScalars,
           roles: {
             create: (roles as LooseRecord[]).map((role) => {
-              const { projects: roleProjects = [], ...roleScalars } = role;
+              const {
+                projects: roleProjects = [],
+                companyId: _roleCompanyId,
+                ...roleScalars
+              } = role;
+              void _roleCompanyId;
               return {
                 ...roleScalars,
-                projects: { create: roleProjects as LooseRecord[] },
+                projects: {
+                  create: (roleProjects as LooseRecord[]).map((project) => {
+                    const { roleId: _projectRoleId, ...projectScalars } = project;
+                    void _projectRoleId;
+                    return projectScalars;
+                  }),
+                },
               };
             }),
           },
         };
       }),
     },
-    educations: { create: educations as LooseRecord[] },
-    skills: { create: skills as LooseRecord[] },
-    certifications: { create: certifications as LooseRecord[] },
-    awards: { create: awards as LooseRecord[] },
-    projects: { create: projects as LooseRecord[] },
-    volunteeringRoles: { create: volunteeringRoles as LooseRecord[] },
-    publications: { create: publications as LooseRecord[] },
+    educations: {
+      create: (educations as LooseRecord[]).map((e) => stripFk(e, 'resumeId')),
+    },
+    skills: {
+      create: (skills as LooseRecord[]).map((s) => stripFk(s, 'resumeId')),
+    },
+    certifications: {
+      create: (certifications as LooseRecord[]).map((c) => stripFk(c, 'resumeId')),
+    },
+    awards: {
+      create: (awards as LooseRecord[]).map((a) => stripFk(a, 'resumeId')),
+    },
+    projects: {
+      create: (projects as LooseRecord[]).map((p) => stripFk(p, 'resumeId')),
+    },
+    volunteeringRoles: {
+      create: (volunteeringRoles as LooseRecord[]).map((v) => stripFk(v, 'resumeId')),
+    },
+    publications: {
+      create: (publications as LooseRecord[]).map((p) => stripFk(p, 'resumeId')),
+    },
   };
 }
 
@@ -243,8 +269,27 @@ function buildApplicationCreate(input: LooseRecord): LooseRecord {
 
   return {
     ...scalarFields,
-    resumeDrafts: { create: resumeDrafts as LooseRecord[] },
-    coverLetterDrafts: { create: coverLetterDrafts as LooseRecord[] },
-    notes: { create: notes as LooseRecord[] },
+    resumeDrafts: {
+      create: (resumeDrafts as LooseRecord[]).map((d) => stripFk(d, 'applicationId')),
+    },
+    coverLetterDrafts: {
+      create: (coverLetterDrafts as LooseRecord[]).map((d) => stripFk(d, 'applicationId')),
+    },
+    notes: {
+      create: (notes as LooseRecord[]).map((n) => stripFk(n, 'applicationId')),
+    },
   };
+}
+
+/**
+ * Strip a foreign-key field from a record before passing it to a nested
+ * Prisma create. Prisma sets the FK automatically from the parent's id, so
+ * including it in `data: { ...fields }` triggers an "Unknown argument" error.
+ * Returns a shallow copy with the key removed.
+ */
+function stripFk(record: LooseRecord, key: string): LooseRecord {
+  if (!(key in record)) return record;
+  const { [key]: _dropped, ...rest } = record;
+  void _dropped;
+  return rest;
 }
