@@ -315,6 +315,7 @@ const AiProviderConfigArchiveSchema = z
     baseUrl: nullableString,
     displayName: nullableString,
     apiMode: nullableString,
+    encryptionVersion: z.number().int().default(1),
     createdAt: isoDate,
     updatedAt: isoDate,
   })
