@@ -299,7 +299,7 @@ Common log clues:
 - `ECONNREFUSED` — wrong SMTP host or port.
 - `Message sent` but no email arrives — recipient inbox is filtering. Check spam / junk.
 
-For local testing, point SMTP at Mailhog:
+For local testing, point SMTP at Mailpit:
 
 ```bash
 # In .env, set SMTP host to localhost and port to 1025
@@ -307,7 +307,7 @@ SMTP_HOST=localhost
 SMTP_PORT=1025
 ```
 
-Then check the Mailhog web UI at [http://localhost:8025](http://localhost:8025) to see the OTP emails.
+Then check the Mailpit web UI at [http://localhost:8025](http://localhost:8025) to see the OTP emails.
 
 ---
 

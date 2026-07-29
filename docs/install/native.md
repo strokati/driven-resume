@@ -41,14 +41,14 @@ Pick the option that matches your PostgreSQL choice:
 
 ### Option A — Database in Docker (recommended)
 
-This starts only the database and Mailhog (a local email catch service for testing). The app itself runs natively.
+This starts only the database and Mailpit (a local email catch service for testing). The app itself runs natively.
 
 ```bash
-# Start the dev database + Mailhog in the background
+# Start the dev database + Mailpit in the background
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-The database runs on `localhost:5432`. Mailhog's web UI is at [http://localhost:8025](http://localhost:8025) — useful if you later switch to self-hosted mode and want to test OTP emails locally.
+The database runs on `localhost:5432`. Mailpit's web UI is at [http://localhost:8025](http://localhost:8025) — useful if you later switch to self-hosted mode and want to test OTP emails locally.
 
 ### Option B — Native or managed Postgres
 
@@ -166,7 +166,7 @@ Press `Ctrl+C` in the terminal where `npm run dev` is running.
 If you started the dev database (Option A), stop it separately:
 
 ```bash
-# Stop the dev database and Mailhog
+# Stop the dev database and Mailpit
 docker compose -f docker-compose.dev.yml down
 ```
 

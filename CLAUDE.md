@@ -66,7 +66,7 @@ No passwords are ever set or stored.
 | File parsing         | **pdf-parse** + **mammoth** (PDF/DOCX import)                       |
 | PDF export           | **Puppeteer** (headless Chrome, WYSIWYG accuracy)                   |
 | DOCX export          | **docx** (npm)                                                      |
-| Dev email catch      | **Mailhog** (Docker sidecar, optional)                              |
+| Dev email catch      | **Mailpit** (Docker sidecar, optional)                              |
 
 ---
 
@@ -115,7 +115,7 @@ npx prisma migrate reset  # ⚠ Wipe + re-seed (dev only — blocked by settings
 npx prisma db seed        # Run prisma/seed.ts
 
 docker compose up                          # Production (local mode)
-docker compose -f docker-compose.dev.yml up  # Dev (+ Mailhog on :8025)
+docker compose -f docker-compose.dev.yml up  # Dev (+ Mailpit on :8025)
 docker compose down                        # Stop all containers
 docker compose logs -f app                 # Tail app logs
 ```

@@ -16,8 +16,8 @@ services:
       timeout: 5s
       retries: 5
 
-  mailhog:
-    image: mailhog/mailhog:latest
+  mailpit:
+    image: axllent/mailpit:v1.22
     restart: unless-stopped
     ports:
       - '1025:1025' # SMTP
