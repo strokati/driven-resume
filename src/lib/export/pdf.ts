@@ -32,6 +32,8 @@ async function getBrowser() {
   });
 }
 
+export { getBrowser };
+
 async function urlToPdf(url: string): Promise<Buffer> {
   const browser = await getBrowser();
   try {

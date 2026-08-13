@@ -9,6 +9,7 @@ export type TrackerRow = {
   proposedSalary: number | null;
   currency: string | null;
   location: string | null;
+  locationType: string | null;
   status: string;
   dateSaved: Date;
   dateApplied: Date | null;
@@ -22,7 +23,35 @@ export type TrackerRow = {
   coverLetterTone: string | null;
   vacancyId: string;
   sourceUrl: string | null;
-  notes: { id: string; content: string; createdAt: Date }[];
+  notes: { id: string; content: string; createdAt: Date; updatedAt: Date }[];
+  contact: {
+    name: string;
+    role: string | null;
+    email: string | null;
+    phone: string | null;
+    linkedinUrl: string | null;
+  } | null;
+};
+
+export type TrackerExportRow = {
+  dateApplied: Date | null;
+  companyName: string;
+  jobTitle: string;
+  location: string | null;
+  locationType: string | null;
+  status: string;
+  interviewDate: Date | null;
+  offerDate: Date | null;
+  rejectedDate: Date | null;
+  sourceUrl: string | null;
+  notes: { content: string; createdAt: Date }[];
+  contact: {
+    name: string;
+    role: string | null;
+    email: string | null;
+    phone: string | null;
+    linkedinUrl: string | null;
+  } | null;
 };
 
 export async function getTrackerData(userId: string): Promise<TrackerRow[]> {
@@ -35,6 +64,7 @@ export async function getTrackerData(userId: string): Promise<TrackerRow[]> {
           jobTitle: true,
           companyName: true,
           location: true,
+          locationType: true,
           sourceUrl: true,
           currency: true,
         },
@@ -50,8 +80,11 @@ export async function getTrackerData(userId: string): Promise<TrackerRow[]> {
         take: 1,
       },
       notes: {
-        select: { id: true, content: true, createdAt: true },
+        select: { id: true, content: true, createdAt: true, updatedAt: true },
         orderBy: { createdAt: 'desc' },
+      },
+      contact: {
+        select: { name: true, role: true, email: true, phone: true, linkedinUrl: true },
       },
     },
     orderBy: { dateSaved: 'desc' },
@@ -84,6 +117,7 @@ export async function getTrackerData(userId: string): Promise<TrackerRow[]> {
       proposedSalary: app.proposedSalary,
       currency: app.vacancy.currency,
       location: app.vacancy.location,
+      locationType: app.vacancy.locationType,
       status: app.status,
       dateSaved: app.dateSaved,
       dateApplied: app.dateApplied,
@@ -98,6 +132,52 @@ export async function getTrackerData(userId: string): Promise<TrackerRow[]> {
       vacancyId: app.vacancy.id,
       sourceUrl: app.vacancy.sourceUrl,
       notes: app.notes,
+      contact: app.contact,
     };
   });
+}
+
+export async function getTrackerExportData(userId: string): Promise<TrackerExportRow[]> {
+  const applications = await db.application.findMany({
+    where: { vacancy: { userId } },
+    select: {
+      dateApplied: true,
+      status: true,
+      interviewDate: true,
+      offerDate: true,
+      rejectedDate: true,
+      vacancy: {
+        select: {
+          companyName: true,
+          jobTitle: true,
+          location: true,
+          locationType: true,
+          sourceUrl: true,
+        },
+      },
+      notes: {
+        select: { content: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      },
+      contact: {
+        select: { name: true, role: true, email: true, phone: true, linkedinUrl: true },
+      },
+    },
+    orderBy: { dateApplied: 'asc' },
+  });
+
+  return applications.map((app) => ({
+    dateApplied: app.dateApplied,
+    companyName: app.vacancy.companyName,
+    jobTitle: app.vacancy.jobTitle,
+    location: app.vacancy.location,
+    locationType: app.vacancy.locationType,
+    status: app.status,
+    interviewDate: app.interviewDate,
+    offerDate: app.offerDate,
+    rejectedDate: app.rejectedDate,
+    sourceUrl: app.vacancy.sourceUrl,
+    notes: app.notes,
+    contact: app.contact,
+  }));
 }

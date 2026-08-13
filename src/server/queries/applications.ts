@@ -29,6 +29,8 @@ export async function getApplicationById(
       masterResume: { select: { id: true, name: true, language: true } },
       resumeDrafts: { orderBy: { createdAt: 'desc' } },
       coverLetterDrafts: { orderBy: { createdAt: 'desc' } },
+      notes: { orderBy: { createdAt: 'desc' } },
+      contact: true,
     },
   });
 }

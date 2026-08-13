@@ -23,5 +23,9 @@ export type ApplicationDetail = Prisma.ApplicationGetPayload<{
     coverLetterDrafts: {
       orderBy: { createdAt: 'desc' };
     };
+    notes: {
+      orderBy: { createdAt: 'desc' };
+    };
+    contact: true;
   };
 }>;
