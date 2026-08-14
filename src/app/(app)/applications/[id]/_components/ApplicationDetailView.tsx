@@ -2,23 +2,23 @@
 
 import { useTransition, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
+  ArrowLeft,
+  ChevronRight,
+  ChevronDown,
+  Download,
   ExternalLink,
-  MapPin,
-  Globe,
-  Calendar,
-  Banknote,
   FileText,
-  Mail,
-  Trash2,
-  ShieldCheck,
-  BookOpen,
+  Globe,
+  Loader2,
   Pencil,
+  Trash2,
+  BookOpen,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -27,20 +27,37 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { StatusStepper } from '@/components/shared/StatusStepper';
 import { ExcitementRating } from '@/components/shared/ExcitementRating';
 import { VacancyAnalysisPanel } from '@/components/resume-editor/VacancyAnalysisPanel';
 import { NotesCard } from '@/components/applications/NotesCard';
 import { ContactCard } from '@/components/applications/ContactCard';
+import { AtsRing } from '@/components/shared/AtsRing';
+import { CollapsibleText } from '@/components/shared/CollapsibleText';
+import {
+  PropertyGroup,
+  PropertyRow,
+  PropertyRowClickable,
+} from '@/components/shared/properties-panel';
 import {
   updateApplicationStatus,
   updateApplicationTracking,
   deleteApplication,
 } from '@/server/actions/applications';
 import { ChangeResumeDialog } from '@/components/applications/ChangeResumeDialog';
+import { useExport } from '@/hooks/use-export';
 import type { ApplicationDetail } from '@/types/applications';
 import type { ApplicationStatus } from '@/lib/validations/applications';
 import { formatSalary } from '@/lib/utils/currency';
+import { statusDotColors } from '@/lib/utils/status';
+import { nextMilestone, stagePhrase } from '@/lib/utils/stage';
 import type { MasterResumeSummary } from '@/types/master-resume';
 
 type AiConfig = { providerId: string; model: string; isDefault: boolean; apiKey: string };
@@ -48,61 +65,6 @@ type AiConfig = { providerId: string; model: string; isDefault: boolean; apiKey:
 function formatDateForInput(date: Date | string | null): string {
   if (!date) return '';
   return new Date(date).toISOString().split('T')[0];
-}
-
-function TrackingField({
-  label,
-  icon: Icon,
-  type = 'text',
-  value,
-  placeholder,
-  onSave,
-}: {
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  type?: string;
-  value: string;
-  placeholder?: string;
-  onSave: (value: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [local, setLocal] = useState(value);
-
-  function handleBlur() {
-    setEditing(false);
-    if (local !== value) onSave(local);
-  }
-
-  return (
-    <div className="flex items-center gap-3 py-1.5">
-      <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-      <span className="text-sm text-muted-foreground w-24 shrink-0">{label}</span>
-      {editing ? (
-        <Input
-          type={type}
-          value={local}
-          onChange={(e) => setLocal(e.target.value)}
-          onBlur={handleBlur}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleBlur();
-          }}
-          autoFocus
-          className="h-8 text-sm"
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => {
-            setEditing(true);
-            setLocal(value);
-          }}
-          className="text-sm hover:underline underline-offset-2"
-        >
-          {value || <span className="text-muted-foreground">{placeholder ?? '—'}</span>}
-        </button>
-      )}
-    </div>
-  );
 }
 
 export function ApplicationDetailView({
@@ -117,6 +79,10 @@ export function ApplicationDetailView({
   const [isPending, startTransition] = useTransition();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showChangeResumeDialog, setShowChangeResumeDialog] = useState(false);
+  const [salaryExpanded, setSalaryExpanded] = useState(false);
+  const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
+  const router = useRouter();
+  const { exportResume, isExporting } = useExport();
   const { vacancy } = application;
 
   const activeResume =
@@ -124,10 +90,24 @@ export function ApplicationDetailView({
   const activeCoverLetter =
     application.coverLetterDrafts.find((d) => d.isActive) ?? application.coverLetterDrafts[0];
 
-  function handleStatusChange(status: ApplicationStatus) {
+  const status = application.status as ApplicationStatus;
+  const milestone = nextMilestone(status, application.interviewDate, application.offerDate);
+  const atsScore = activeResume?.atsScore
+    ? ((activeResume.atsScore as { score?: number }).score ?? null)
+    : null;
+
+  const salarySummary =
+    application.salaryMin != null || application.salaryMax != null
+      ? `${application.salaryMin != null ? formatSalary(application.salaryMin, vacancy.currency) : ''}${
+          application.salaryMin != null && application.salaryMax != null ? ' – ' : ''
+        }${application.salaryMax != null ? formatSalary(application.salaryMax, vacancy.currency) : ''}`
+      : null;
+
+  function handleStatusChange(nextStatus: ApplicationStatus) {
     startTransition(async () => {
       try {
-        await updateApplicationStatus(application.id, { status });
+        await updateApplicationStatus(application.id, { status: nextStatus });
+        setStatusPopoverOpen(false);
       } catch {
         toast.error('Failed to update status');
       }
@@ -168,64 +148,150 @@ export function ApplicationDetailView({
     });
   }
 
+  function handleExport(format: 'pdf' | 'docx') {
+    if (!activeResume) return;
+    startTransition(async () => {
+      try {
+        await exportResume(activeResume.id, format);
+        toast.success(`${format.toUpperCase()} export ready`);
+      } catch {
+        toast.error('Export failed. Please try again.');
+      }
+    });
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between pb-2">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{vacancy.jobTitle}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{vacancy.companyName}</p>
+      {/* Sticky page header */}
+      <div className="sticky top-0 z-20 -mx-6 px-6 py-3 bg-background/95 backdrop-blur border-b">
+        <div className="flex items-center justify-between gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-muted-foreground"
+            onClick={() => router.push('/applications')}
+          >
+            <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+            Applications
+          </Button>
+
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="outline" size="sm" disabled={!activeResume || isExporting} />
+                }
+              >
+                {isExporting ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Export
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled={!activeResume} onClick={() => handleExport('pdf')}>
+                  <FileText className="h-3.5 w-3.5 mr-2" />
+                  PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!activeResume} onClick={() => handleExport('docx')}>
+                  <FileText className="h-3.5 w-3.5 mr-2" />
+                  Word
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Link href={`/applications/${application.id}/resume`}>
+              <Button size="sm">{activeResume ? 'Open Resume' : 'Create Resume'}</Button>
+            </Link>
+          </div>
         </div>
+
+        <div className="flex items-center gap-3 flex-wrap mt-2">
+          <h1 className="text-xl font-bold tracking-tight truncate">{vacancy.jobTitle}</h1>
+          <span className="text-sm text-muted-foreground truncate">{vacancy.companyName}</span>
+        </div>
+
+        {/* Status chip with stepper popover */}
+        <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
+          <PopoverTrigger
+            render={
+              <button
+                type="button"
+                className="group inline-flex items-center gap-2 rounded-md px-1.5 py-0.5 -ml-1.5 text-sm hover:bg-muted/50 transition-colors"
+              />
+            }
+          >
+            <span
+              className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                statusDotColors[status] ?? 'bg-slate-400'
+              }`}
+            />
+            <span className="font-medium">{stagePhrase(status, application.updatedAt)}</span>
+            {milestone && (
+              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                <ChevronRight className="h-3 w-3" />
+                {milestone.label}
+              </span>
+            )}
+            <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-72 p-3">
+            <StatusStepper currentStatus={status} onChange={handleStatusChange} />
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
-        {/* Left column — Vacancy */}
+        {/* Left column — Vacancy, AI Analysis, Notes */}
         <div className="space-y-4">
           <Card>
-            <CardContent className="p-5 space-y-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                {vacancy.location && (
-                  <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {vacancy.location}
-                  </span>
-                )}
-                {vacancy.locationType && (
-                  <Badge variant="outline" className="text-xs">
-                    {vacancy.locationType}
-                  </Badge>
-                )}
-                {(vacancy.salaryMin || vacancy.salaryMax) && (
-                  <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <Banknote className="h-3.5 w-3.5" />
-                    {vacancy.salaryMin != null && formatSalary(vacancy.salaryMin, vacancy.currency)}
-                    {vacancy.salaryMin != null && vacancy.salaryMax != null && ' – '}
-                    {vacancy.salaryMax != null && formatSalary(vacancy.salaryMax, vacancy.currency)}
-                  </span>
-                )}
-              </div>
-
-              {vacancy.sourceUrl && (
-                <a
-                  href={vacancy.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                >
-                  <Globe className="h-3.5 w-3.5" />
-                  Source link
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
+            <CardContent className="p-4">
+              <PropertyGroup label="Vacancy">
+                <PropertyRow
+                  label="Location"
+                  value={vacancy.location || <span className="text-muted-foreground">—</span>}
+                />
+                <PropertyRow
+                  label="Type"
+                  value={vacancy.locationType || <span className="text-muted-foreground">—</span>}
+                />
+                <PropertyRow
+                  label="Salary"
+                  value={
+                    vacancy.salaryMin != null || vacancy.salaryMax != null ? (
+                      `${vacancy.salaryMin != null ? formatSalary(vacancy.salaryMin, vacancy.currency) : ''}${
+                        vacancy.salaryMin != null && vacancy.salaryMax != null ? ' – ' : ''
+                      }${vacancy.salaryMax != null ? formatSalary(vacancy.salaryMax, vacancy.currency) : ''}`
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )
+                  }
+                />
+                <PropertyRow
+                  label="Source"
+                  value={
+                    vacancy.sourceUrl ? (
+                      <a
+                        href={vacancy.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                      >
+                        <Globe className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">Source link</span>
+                        <ExternalLink className="h-3 w-3 shrink-0" />
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )
+                  }
+                />
+              </PropertyGroup>
 
               {vacancy.rawText && (
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                    Job Posting
-                  </h3>
-                  <pre className="max-h-80 overflow-auto rounded-xl bg-muted/50 p-4 text-xs leading-relaxed whitespace-pre-wrap font-mono">
-                    {vacancy.rawText}
-                  </pre>
-                </div>
+                <PropertyGroup label="Job Posting">
+                  <CollapsibleText text={vacancy.rawText} label="Show full posting" />
+                </PropertyGroup>
               )}
             </CardContent>
           </Card>
@@ -236,205 +302,190 @@ export function ApplicationDetailView({
             configs={aiConfigs}
             existingAnalysis={vacancy.aiAnalysis}
           />
+
+          {/* Notes — narrative content lives with the vacancy */}
+          <NotesCard applicationId={application.id} notes={application.notes} />
         </div>
 
-        {/* Right column — Tracking & Documents */}
-        <div className="space-y-4">
-          {/* Status */}
+        {/* Right column — single properties panel */}
+        <div>
           <Card>
-            <CardContent className="p-5 space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Status
-              </h3>
-              <StatusStepper
-                currentStatus={application.status as ApplicationStatus}
-                onChange={handleStatusChange}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Excitement */}
-          <Card>
-            <CardContent className="p-5 space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Excitement
-              </h3>
-              <ExcitementRating value={application.excitement} onChange={handleExcitementChange} />
-            </CardContent>
-          </Card>
-
-          {/* Tracking fields */}
-          <Card>
-            <CardContent className="p-5 space-y-1">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                Tracking
-              </h3>
-              <TrackingField
-                label="Date Applied"
-                icon={Calendar}
-                type="date"
-                value={formatDateForInput(application.dateApplied)}
-                placeholder="Not set"
-                onSave={(v) => handleTrackingSave('dateApplied', v)}
-              />
-              <TrackingField
-                label="Interview Date"
-                icon={Calendar}
-                type="date"
-                value={formatDateForInput(application.interviewDate)}
-                placeholder="Not set"
-                onSave={(v) => handleTrackingSave('interviewDate', v)}
-              />
-              <TrackingField
-                label="Offer Date"
-                icon={Calendar}
-                type="date"
-                value={formatDateForInput(application.offerDate)}
-                placeholder="Not set"
-                onSave={(v) => handleTrackingSave('offerDate', v)}
-              />
-              <TrackingField
-                label="Rejected Date"
-                icon={Calendar}
-                type="date"
-                value={formatDateForInput(application.rejectedDate)}
-                placeholder="Not set"
-                onSave={(v) => handleTrackingSave('rejectedDate', v)}
-              />
-              <TrackingField
-                label="Salary Min"
-                icon={Banknote}
-                type="number"
-                value={application.salaryMin?.toString() ?? ''}
-                placeholder="—"
-                onSave={(v) => handleTrackingSave('salaryMin', v)}
-              />
-              <TrackingField
-                label="Salary Max"
-                icon={Banknote}
-                type="number"
-                value={application.salaryMax?.toString() ?? ''}
-                placeholder="—"
-                onSave={(v) => handleTrackingSave('salaryMax', v)}
-              />
-              <TrackingField
-                label="Proposed Salary"
-                icon={Banknote}
-                type="number"
-                value={application.proposedSalary?.toString() ?? ''}
-                placeholder="—"
-                onSave={(v) => handleTrackingSave('proposedSalary', v)}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Contact Person */}
-          <ContactCard applicationId={application.id} contact={application.contact} />
-
-          {/* Notes */}
-          <NotesCard applicationId={application.id} notes={application.notes} />
-
-          {/* Source Resume */}
-          <Card>
-            <CardContent className="p-5 space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Source Resume
-              </h3>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {application.masterResume
-                        ? `${application.masterResume.name} (${application.masterResume.language.toUpperCase()})`
-                        : 'Default resume'}
-                    </p>
+            <CardContent className="p-4">
+              {/* Tracking */}
+              <PropertyGroup label="Tracking">
+                <PropertyRowClickable
+                  label="Applied date"
+                  type="date"
+                  value={formatDateForInput(application.dateApplied)}
+                  placeholder="Not set"
+                  onSave={(v) => handleTrackingSave('dateApplied', v)}
+                />
+                <PropertyRowClickable
+                  label="Interview"
+                  type="date"
+                  value={formatDateForInput(application.interviewDate)}
+                  placeholder="Not set"
+                  onSave={(v) => handleTrackingSave('interviewDate', v)}
+                />
+                <PropertyRowClickable
+                  label="Offer"
+                  type="date"
+                  value={formatDateForInput(application.offerDate)}
+                  placeholder="Not set"
+                  onSave={(v) => handleTrackingSave('offerDate', v)}
+                />
+                <PropertyRowClickable
+                  label="Rejected"
+                  type="date"
+                  value={formatDateForInput(application.rejectedDate)}
+                  placeholder="Not set"
+                  onSave={(v) => handleTrackingSave('rejectedDate', v)}
+                />
+                {salaryExpanded ? (
+                  <div className="space-y-1 pt-1">
+                    <PropertyRowClickable
+                      label="Salary min"
+                      type="number"
+                      value={application.salaryMin?.toString() ?? ''}
+                      onSave={(v) => handleTrackingSave('salaryMin', v)}
+                    />
+                    <PropertyRowClickable
+                      label="Salary max"
+                      type="number"
+                      value={application.salaryMax?.toString() ?? ''}
+                      onSave={(v) => handleTrackingSave('salaryMax', v)}
+                    />
+                    <PropertyRowClickable
+                      label="Proposed"
+                      type="number"
+                      value={application.proposedSalary?.toString() ?? ''}
+                      onSave={(v) => handleTrackingSave('proposedSalary', v)}
+                    />
                   </div>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => setShowChangeResumeDialog(true)}>
-                  <Pencil className="h-3.5 w-3.5 mr-1" />
-                  Change
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                ) : (
+                  <PropertyRow
+                    label="Salary"
+                    value={
+                      <button
+                        type="button"
+                        onClick={() => setSalaryExpanded(true)}
+                        className="hover:underline underline-offset-2 text-left flex items-center gap-1"
+                      >
+                        {salarySummary ?? <span className="text-muted-foreground">—</span>}
+                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                    }
+                  />
+                )}
+                <PropertyRow
+                  label="Excitement"
+                  value={
+                    <ExcitementRating
+                      value={application.excitement}
+                      onChange={handleExcitementChange}
+                    />
+                  }
+                />
+              </PropertyGroup>
 
-          {/* Documents */}
-          <Card>
-            <CardContent className="p-5 space-y-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Documents
-              </h3>
+              {/* Contact */}
+              <PropertyGroup label="Contact">
+                <ContactCard
+                  applicationId={application.id}
+                  contact={application.contact}
+                  variant="inline"
+                />
+              </PropertyGroup>
 
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {activeResume ? activeResume.name : 'No resume'}
-                    </p>
-                    {activeResume && (
-                      <div className="flex items-center gap-1.5 mt-0.5">
+              {/* Documents */}
+              <PropertyGroup label="Documents">
+                <PropertyRow
+                  label="Resume"
+                  value={
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      {atsScore != null && <AtsRing score={atsScore} size={24} />}
+                      <span className="truncate">{activeResume ? activeResume.name : 'None'}</span>
+                      {activeResume?.status === 'ready' && (
                         <Badge
                           variant="outline"
-                          className={`text-[0.6rem] ${
-                            activeResume.status === 'ready'
-                              ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800'
-                              : ''
-                          }`}
+                          className="text-[0.6rem] shrink-0 bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"
                         >
-                          {activeResume.status === 'ready' ? '✓ Ready' : activeResume.status}
+                          ✓ ready
                         </Badge>
-                        {activeResume.atsScore && (
-                          <span className="flex items-center gap-0.5 text-[0.6rem] text-muted-foreground">
-                            <ShieldCheck className="h-3 w-3" />
-                            {(activeResume.atsScore as { overallScore?: number }).overallScore ??
-                              ''}
-                            /100
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <Link href={`/applications/${application.id}/resume`}>
-                  <Button size="sm">{activeResume ? 'Open Editor' : 'Create Resume'}</Button>
-                </Link>
-              </div>
+                      )}
+                    </span>
+                  }
+                  action={
+                    <Link href={`/applications/${application.id}/resume`}>
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                        Open
+                      </Button>
+                    </Link>
+                  }
+                />
+                <PropertyRow
+                  label="Cover letter"
+                  value={
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span className="truncate">
+                        {activeCoverLetter ? activeCoverLetter.name : 'None'}
+                      </span>
+                      {activeCoverLetter && (
+                        <Badge variant="outline" className="text-[0.6rem] shrink-0">
+                          {activeCoverLetter.status}
+                        </Badge>
+                      )}
+                    </span>
+                  }
+                  action={
+                    <Link href={`/applications/${application.id}/cover-letter`}>
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                        Open
+                      </Button>
+                    </Link>
+                  }
+                />
+              </PropertyGroup>
 
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {activeCoverLetter ? activeCoverLetter.name : 'No cover letter'}
-                    </p>
-                    {activeCoverLetter && (
-                      <Badge variant="outline" className="text-[0.6rem] mt-0.5">
-                        {activeCoverLetter.status}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <Link href={`/applications/${application.id}/cover-letter`}>
-                  <Button size="sm">{activeCoverLetter ? 'Open Editor' : 'Create Letter'}</Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+              {/* Source resume */}
+              <PropertyGroup label="Source Resume">
+                <PropertyRow
+                  label="Master"
+                  value={
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="truncate">
+                        {application.masterResume
+                          ? `${application.masterResume.name} (${application.masterResume.language.toUpperCase()})`
+                          : 'Default resume'}
+                      </span>
+                    </span>
+                  }
+                  action={
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setShowChangeResumeDialog(true)}
+                    >
+                      Change
+                    </Button>
+                  }
+                />
+              </PropertyGroup>
 
-          {/* Danger zone */}
-          <Card>
-            <CardContent className="p-5">
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowDeleteDialog(true)}
-                className="w-full"
-              >
-                <Trash2 className="h-4 w-4 mr-1.5" />
-                Delete Application
-              </Button>
+              {/* Quiet destructive action */}
+              <div className="pt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={isPending}
+                  className="text-xs text-destructive/70 hover:text-destructive underline-offset-2 hover:underline transition-colors inline-flex items-center gap-1"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Delete application…
+                </button>
+              </div>
             </CardContent>
           </Card>
         </div>

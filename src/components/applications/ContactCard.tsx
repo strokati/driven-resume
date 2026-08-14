@@ -43,9 +43,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function ContactCard({
   applicationId,
   contact,
+  variant = 'card',
 }: {
   applicationId: string;
   contact: Contact;
+  variant?: 'card' | 'inline';
 }) {
   const [isPending, startTransition] = useTransition();
   const [mode, setMode] = useState<'view' | 'edit'>(contact ? 'view' : 'view');
@@ -109,36 +111,63 @@ export function ContactCard({
   }
 
   return (
-    <Card>
-      <CardContent className="p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Contact Person
-          </h3>
-          {mode === 'view' && contact && (
+    <Card className={variant === 'inline' ? 'border-0 shadow-none p-0' : undefined}>
+      <CardContent className={variant === 'inline' ? 'p-0 space-y-3' : 'p-5 space-y-3'}>
+        {variant === 'card' && (
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Contact Person
+            </h3>
+            {mode === 'view' && contact && (
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={startEdit}
+                  disabled={isPending}
+                  className="h-7 px-2"
+                >
+                  <Pencil className="h-3 w-3 mr-1" />
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleDelete}
+                  disabled={isPending}
+                  className="h-7 px-2 text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+        {variant === 'inline' && mode === 'view' && contact && (
+          <div className="flex justify-end -mb-1">
             <div className="flex gap-1">
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={startEdit}
                 disabled={isPending}
-                className="h-7 px-2"
+                className="h-6 px-1.5 text-xs text-muted-foreground"
               >
-                <Pencil className="h-3 w-3 mr-1" />
-                Edit
+                <Pencil className="h-3 w-3" />
+                edit
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={handleDelete}
                 disabled={isPending}
-                className="h-7 px-2 text-destructive hover:text-destructive"
+                className="h-6 px-1.5 text-xs text-muted-foreground hover:text-destructive"
               >
                 <Trash2 className="h-3 w-3" />
               </Button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {mode === 'view' && !contact && (
           <div className="space-y-2">
