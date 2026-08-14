@@ -5,9 +5,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import {
   ExternalLink,
-  MapPin,
   Globe,
-  Banknote,
   Trash2,
   ShieldCheck,
   BookOpen,
@@ -165,51 +163,55 @@ export function ApplicationDetailView({
         {/* Left column — Vacancy, AI Analysis, Notes */}
         <div className="space-y-4">
           <Card>
-            <CardContent className="p-5 space-y-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                {vacancy.location && (
-                  <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {vacancy.location}
-                  </span>
-                )}
-                {vacancy.locationType && (
-                  <Badge variant="outline" className="text-xs">
-                    {vacancy.locationType}
-                  </Badge>
-                )}
-                {(vacancy.salaryMin || vacancy.salaryMax) && (
-                  <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <Banknote className="h-3.5 w-3.5" />
-                    {vacancy.salaryMin != null && formatSalary(vacancy.salaryMin, vacancy.currency)}
-                    {vacancy.salaryMin != null && vacancy.salaryMax != null && ' – '}
-                    {vacancy.salaryMax != null && formatSalary(vacancy.salaryMax, vacancy.currency)}
-                  </span>
-                )}
-              </div>
-
-              {vacancy.sourceUrl && (
-                <a
-                  href={vacancy.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
-                >
-                  <Globe className="h-3.5 w-3.5" />
-                  Source link
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
+            <CardContent className="p-4">
+              <PropertyGroup label="Vacancy">
+                <PropertyRow
+                  label="Location"
+                  value={vacancy.location || <span className="text-muted-foreground">—</span>}
+                />
+                <PropertyRow
+                  label="Type"
+                  value={vacancy.locationType || <span className="text-muted-foreground">—</span>}
+                />
+                <PropertyRow
+                  label="Salary"
+                  value={
+                    vacancy.salaryMin != null || vacancy.salaryMax != null ? (
+                      `${vacancy.salaryMin != null ? formatSalary(vacancy.salaryMin, vacancy.currency) : ''}${
+                        vacancy.salaryMin != null && vacancy.salaryMax != null ? ' – ' : ''
+                      }${vacancy.salaryMax != null ? formatSalary(vacancy.salaryMax, vacancy.currency) : ''}`
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )
+                  }
+                />
+                <PropertyRow
+                  label="Source"
+                  value={
+                    vacancy.sourceUrl ? (
+                      <a
+                        href={vacancy.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                      >
+                        <Globe className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">Source link</span>
+                        <ExternalLink className="h-3 w-3 shrink-0" />
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )
+                  }
+                />
+              </PropertyGroup>
 
               {vacancy.rawText && (
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                    Job Posting
-                  </h3>
+                <PropertyGroup label="Job Posting">
                   <pre className="max-h-80 overflow-auto rounded-xl bg-muted/50 p-4 text-xs leading-relaxed whitespace-pre-wrap font-mono">
                     {vacancy.rawText}
                   </pre>
-                </div>
+                </PropertyGroup>
               )}
             </CardContent>
           </Card>
