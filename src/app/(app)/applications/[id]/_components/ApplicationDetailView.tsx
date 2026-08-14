@@ -7,18 +7,16 @@ import {
   ExternalLink,
   MapPin,
   Globe,
-  Calendar,
   Banknote,
-  FileText,
-  Mail,
   Trash2,
   ShieldCheck,
   BookOpen,
   Pencil,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -27,11 +25,17 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { StatusStepper } from '@/components/shared/StatusStepper';
 import { ExcitementRating } from '@/components/shared/ExcitementRating';
 import { VacancyAnalysisPanel } from '@/components/resume-editor/VacancyAnalysisPanel';
 import { NotesCard } from '@/components/applications/NotesCard';
 import { ContactCard } from '@/components/applications/ContactCard';
+import {
+  PropertyGroup,
+  PropertyRow,
+  PropertyRowClickable,
+} from '@/components/shared/properties-panel';
 import {
   updateApplicationStatus,
   updateApplicationTracking,
@@ -41,6 +45,7 @@ import { ChangeResumeDialog } from '@/components/applications/ChangeResumeDialog
 import type { ApplicationDetail } from '@/types/applications';
 import type { ApplicationStatus } from '@/lib/validations/applications';
 import { formatSalary } from '@/lib/utils/currency';
+import { statusDotColors, statusLabels } from '@/lib/utils/status';
 import type { MasterResumeSummary } from '@/types/master-resume';
 
 type AiConfig = { providerId: string; model: string; isDefault: boolean; apiKey: string };
@@ -50,59 +55,25 @@ function formatDateForInput(date: Date | string | null): string {
   return new Date(date).toISOString().split('T')[0];
 }
 
-function TrackingField({
-  label,
-  icon: Icon,
-  type = 'text',
-  value,
-  placeholder,
-  onSave,
-}: {
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  type?: string;
-  value: string;
-  placeholder?: string;
-  onSave: (value: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [local, setLocal] = useState(value);
+function formatShortDate(date: Date | string | null): string {
+  if (!date) return '';
+  return new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
-  function handleBlur() {
-    setEditing(false);
-    if (local !== value) onSave(local);
+function nextStepHint(
+  status: string,
+  interviewDate: Date | null,
+  offerDate: Date | null
+): string | null {
+  const now = Date.now();
+  if (interviewDate && new Date(interviewDate).getTime() > now) {
+    return `Interview ${formatShortDate(interviewDate)}`;
   }
-
-  return (
-    <div className="flex items-center gap-3 py-1.5">
-      <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-      <span className="text-sm text-muted-foreground w-24 shrink-0">{label}</span>
-      {editing ? (
-        <Input
-          type={type}
-          value={local}
-          onChange={(e) => setLocal(e.target.value)}
-          onBlur={handleBlur}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleBlur();
-          }}
-          autoFocus
-          className="h-8 text-sm"
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => {
-            setEditing(true);
-            setLocal(value);
-          }}
-          className="text-sm hover:underline underline-offset-2"
-        >
-          {value || <span className="text-muted-foreground">{placeholder ?? '—'}</span>}
-        </button>
-      )}
-    </div>
-  );
+  if (offerDate && new Date(offerDate).getTime() > now) {
+    return `Offer ${formatShortDate(offerDate)}`;
+  }
+  if (status === 'applied' || status === 'screening') return 'Awaiting response';
+  return null;
 }
 
 export function ApplicationDetailView({
@@ -117,6 +88,8 @@ export function ApplicationDetailView({
   const [isPending, startTransition] = useTransition();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showChangeResumeDialog, setShowChangeResumeDialog] = useState(false);
+  const [salaryExpanded, setSalaryExpanded] = useState(false);
+  const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
   const { vacancy } = application;
 
   const activeResume =
@@ -124,10 +97,21 @@ export function ApplicationDetailView({
   const activeCoverLetter =
     application.coverLetterDrafts.find((d) => d.isActive) ?? application.coverLetterDrafts[0];
 
-  function handleStatusChange(status: ApplicationStatus) {
+  const status = application.status as ApplicationStatus;
+  const hint = nextStepHint(status, application.interviewDate, application.offerDate);
+
+  const salarySummary =
+    application.salaryMin != null || application.salaryMax != null
+      ? `${application.salaryMin != null ? formatSalary(application.salaryMin, vacancy.currency) : ''}${
+          application.salaryMin != null && application.salaryMax != null ? ' – ' : ''
+        }${application.salaryMax != null ? formatSalary(application.salaryMax, vacancy.currency) : ''}`
+      : null;
+
+  function handleStatusChange(nextStatus: ApplicationStatus) {
     startTransition(async () => {
       try {
-        await updateApplicationStatus(application.id, { status });
+        await updateApplicationStatus(application.id, { status: nextStatus });
+        setStatusPopoverOpen(false);
       } catch {
         toast.error('Failed to update status');
       }
@@ -178,7 +162,7 @@ export function ApplicationDetailView({
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
-        {/* Left column — Vacancy */}
+        {/* Left column — Vacancy, AI Analysis, Notes */}
         <div className="space-y-4">
           <Card>
             <CardContent className="p-5 space-y-4">
@@ -236,205 +220,224 @@ export function ApplicationDetailView({
             configs={aiConfigs}
             existingAnalysis={vacancy.aiAnalysis}
           />
+
+          {/* Notes — narrative content lives with the vacancy */}
+          <NotesCard applicationId={application.id} notes={application.notes} />
         </div>
 
-        {/* Right column — Tracking & Documents */}
-        <div className="space-y-4">
-          {/* Status */}
+        {/* Right column — single properties panel */}
+        <div>
           <Card>
-            <CardContent className="p-5 space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Status
-              </h3>
-              <StatusStepper
-                currentStatus={application.status as ApplicationStatus}
-                onChange={handleStatusChange}
-              />
-            </CardContent>
-          </Card>
+            <CardContent className="p-4">
+              {/* Status header */}
+              <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
+                <PopoverTrigger
+                  render={
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 w-full text-left group -mx-1 px-1 py-2 rounded-md hover:bg-muted/50 transition-colors"
+                    />
+                  }
+                >
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                      statusDotColors[status] ?? 'bg-slate-400'
+                    }`}
+                  />
+                  <span className="text-sm font-medium">{statusLabels[status] ?? status}</span>
+                  {hint && (
+                    <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                      <ChevronRight className="h-3 w-3" />
+                      {hint}
+                    </span>
+                  )}
+                  <Pencil className="h-3 w-3 ml-auto text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-72 p-3">
+                  <StatusStepper currentStatus={status} onChange={handleStatusChange} />
+                </PopoverContent>
+              </Popover>
 
-          {/* Excitement */}
-          <Card>
-            <CardContent className="p-5 space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Excitement
-              </h3>
-              <ExcitementRating value={application.excitement} onChange={handleExcitementChange} />
-            </CardContent>
-          </Card>
-
-          {/* Tracking fields */}
-          <Card>
-            <CardContent className="p-5 space-y-1">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                Tracking
-              </h3>
-              <TrackingField
-                label="Date Applied"
-                icon={Calendar}
-                type="date"
-                value={formatDateForInput(application.dateApplied)}
-                placeholder="Not set"
-                onSave={(v) => handleTrackingSave('dateApplied', v)}
-              />
-              <TrackingField
-                label="Interview Date"
-                icon={Calendar}
-                type="date"
-                value={formatDateForInput(application.interviewDate)}
-                placeholder="Not set"
-                onSave={(v) => handleTrackingSave('interviewDate', v)}
-              />
-              <TrackingField
-                label="Offer Date"
-                icon={Calendar}
-                type="date"
-                value={formatDateForInput(application.offerDate)}
-                placeholder="Not set"
-                onSave={(v) => handleTrackingSave('offerDate', v)}
-              />
-              <TrackingField
-                label="Rejected Date"
-                icon={Calendar}
-                type="date"
-                value={formatDateForInput(application.rejectedDate)}
-                placeholder="Not set"
-                onSave={(v) => handleTrackingSave('rejectedDate', v)}
-              />
-              <TrackingField
-                label="Salary Min"
-                icon={Banknote}
-                type="number"
-                value={application.salaryMin?.toString() ?? ''}
-                placeholder="—"
-                onSave={(v) => handleTrackingSave('salaryMin', v)}
-              />
-              <TrackingField
-                label="Salary Max"
-                icon={Banknote}
-                type="number"
-                value={application.salaryMax?.toString() ?? ''}
-                placeholder="—"
-                onSave={(v) => handleTrackingSave('salaryMax', v)}
-              />
-              <TrackingField
-                label="Proposed Salary"
-                icon={Banknote}
-                type="number"
-                value={application.proposedSalary?.toString() ?? ''}
-                placeholder="—"
-                onSave={(v) => handleTrackingSave('proposedSalary', v)}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Contact Person */}
-          <ContactCard applicationId={application.id} contact={application.contact} />
-
-          {/* Notes */}
-          <NotesCard applicationId={application.id} notes={application.notes} />
-
-          {/* Source Resume */}
-          <Card>
-            <CardContent className="p-5 space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Source Resume
-              </h3>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {application.masterResume
-                        ? `${application.masterResume.name} (${application.masterResume.language.toUpperCase()})`
-                        : 'Default resume'}
-                    </p>
+              {/* Tracking */}
+              <PropertyGroup label="Tracking">
+                <PropertyRowClickable
+                  label="Applied date"
+                  type="date"
+                  value={formatDateForInput(application.dateApplied)}
+                  placeholder="Not set"
+                  onSave={(v) => handleTrackingSave('dateApplied', v)}
+                />
+                <PropertyRowClickable
+                  label="Interview"
+                  type="date"
+                  value={formatDateForInput(application.interviewDate)}
+                  placeholder="Not set"
+                  onSave={(v) => handleTrackingSave('interviewDate', v)}
+                />
+                <PropertyRowClickable
+                  label="Offer"
+                  type="date"
+                  value={formatDateForInput(application.offerDate)}
+                  placeholder="Not set"
+                  onSave={(v) => handleTrackingSave('offerDate', v)}
+                />
+                <PropertyRowClickable
+                  label="Rejected"
+                  type="date"
+                  value={formatDateForInput(application.rejectedDate)}
+                  placeholder="Not set"
+                  onSave={(v) => handleTrackingSave('rejectedDate', v)}
+                />
+                {salaryExpanded ? (
+                  <div className="space-y-1 pt-1">
+                    <PropertyRowClickable
+                      label="Salary min"
+                      type="number"
+                      value={application.salaryMin?.toString() ?? ''}
+                      onSave={(v) => handleTrackingSave('salaryMin', v)}
+                    />
+                    <PropertyRowClickable
+                      label="Salary max"
+                      type="number"
+                      value={application.salaryMax?.toString() ?? ''}
+                      onSave={(v) => handleTrackingSave('salaryMax', v)}
+                    />
+                    <PropertyRowClickable
+                      label="Proposed"
+                      type="number"
+                      value={application.proposedSalary?.toString() ?? ''}
+                      onSave={(v) => handleTrackingSave('proposedSalary', v)}
+                    />
                   </div>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => setShowChangeResumeDialog(true)}>
-                  <Pencil className="h-3.5 w-3.5 mr-1" />
-                  Change
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                ) : (
+                  <PropertyRow
+                    label="Salary"
+                    value={
+                      <button
+                        type="button"
+                        onClick={() => setSalaryExpanded(true)}
+                        className="hover:underline underline-offset-2 text-left flex items-center gap-1"
+                      >
+                        {salarySummary ?? <span className="text-muted-foreground">—</span>}
+                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                    }
+                  />
+                )}
+                <PropertyRow
+                  label="Excitement"
+                  value={
+                    <ExcitementRating
+                      value={application.excitement}
+                      onChange={handleExcitementChange}
+                    />
+                  }
+                />
+              </PropertyGroup>
 
-          {/* Documents */}
-          <Card>
-            <CardContent className="p-5 space-y-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Documents
-              </h3>
+              {/* Contact */}
+              <PropertyGroup label="Contact">
+                <ContactCard
+                  applicationId={application.id}
+                  contact={application.contact}
+                  variant="inline"
+                />
+              </PropertyGroup>
 
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {activeResume ? activeResume.name : 'No resume'}
-                    </p>
-                    {activeResume && (
-                      <div className="flex items-center gap-1.5 mt-0.5">
+              {/* Documents */}
+              <PropertyGroup label="Documents">
+                <PropertyRow
+                  label="Resume"
+                  value={
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span className="truncate">{activeResume ? activeResume.name : 'None'}</span>
+                      {activeResume?.status === 'ready' && (
                         <Badge
                           variant="outline"
-                          className={`text-[0.6rem] ${
-                            activeResume.status === 'ready'
-                              ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800'
-                              : ''
-                          }`}
+                          className="text-[0.6rem] shrink-0 bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"
                         >
-                          {activeResume.status === 'ready' ? '✓ Ready' : activeResume.status}
+                          ✓ ready
                         </Badge>
-                        {activeResume.atsScore && (
-                          <span className="flex items-center gap-0.5 text-[0.6rem] text-muted-foreground">
-                            <ShieldCheck className="h-3 w-3" />
-                            {(activeResume.atsScore as { overallScore?: number }).overallScore ??
-                              ''}
-                            /100
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <Link href={`/applications/${application.id}/resume`}>
-                  <Button size="sm">{activeResume ? 'Open Editor' : 'Create Resume'}</Button>
-                </Link>
-              </div>
+                      )}
+                      {activeResume?.atsScore && (
+                        <span className="flex items-center gap-0.5 text-[0.6rem] text-muted-foreground shrink-0">
+                          <ShieldCheck className="h-3 w-3" />
+                          {(activeResume.atsScore as { score?: number }).score ?? ''}/100
+                        </span>
+                      )}
+                    </span>
+                  }
+                  action={
+                    <Link href={`/applications/${application.id}/resume`}>
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                        Open
+                      </Button>
+                    </Link>
+                  }
+                />
+                <PropertyRow
+                  label="Cover letter"
+                  value={
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <span className="truncate">
+                        {activeCoverLetter ? activeCoverLetter.name : 'None'}
+                      </span>
+                      {activeCoverLetter && (
+                        <Badge variant="outline" className="text-[0.6rem] shrink-0">
+                          {activeCoverLetter.status}
+                        </Badge>
+                      )}
+                    </span>
+                  }
+                  action={
+                    <Link href={`/applications/${application.id}/cover-letter`}>
+                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                        Open
+                      </Button>
+                    </Link>
+                  }
+                />
+              </PropertyGroup>
 
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {activeCoverLetter ? activeCoverLetter.name : 'No cover letter'}
-                    </p>
-                    {activeCoverLetter && (
-                      <Badge variant="outline" className="text-[0.6rem] mt-0.5">
-                        {activeCoverLetter.status}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <Link href={`/applications/${application.id}/cover-letter`}>
-                  <Button size="sm">{activeCoverLetter ? 'Open Editor' : 'Create Letter'}</Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+              {/* Source resume */}
+              <PropertyGroup label="Source Resume">
+                <PropertyRow
+                  label="Master"
+                  value={
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="truncate">
+                        {application.masterResume
+                          ? `${application.masterResume.name} (${application.masterResume.language.toUpperCase()})`
+                          : 'Default resume'}
+                      </span>
+                    </span>
+                  }
+                  action={
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setShowChangeResumeDialog(true)}
+                    >
+                      Change
+                    </Button>
+                  }
+                />
+              </PropertyGroup>
 
-          {/* Danger zone */}
-          <Card>
-            <CardContent className="p-5">
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowDeleteDialog(true)}
-                className="w-full"
-              >
-                <Trash2 className="h-4 w-4 mr-1.5" />
-                Delete Application
-              </Button>
+              {/* Quiet destructive action */}
+              <div className="pt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={isPending}
+                  className="text-xs text-destructive/70 hover:text-destructive underline-offset-2 hover:underline transition-colors inline-flex items-center gap-1"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Delete application…
+                </button>
+              </div>
             </CardContent>
           </Card>
         </div>
