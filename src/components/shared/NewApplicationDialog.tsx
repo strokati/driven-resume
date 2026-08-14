@@ -26,6 +26,9 @@ import {
 import { createApplication } from '@/server/actions/applications';
 import {
   CreateApplicationSchema,
+  CONTACT_NAME_MAX,
+  CONTACT_ROLE_MAX,
+  CONTACT_PHONE_MAX,
   type CreateApplicationInput,
 } from '@/lib/validations/applications';
 import { COMMON_CURRENCIES } from '@/lib/utils/currency';
@@ -62,6 +65,13 @@ function NewApplicationForm({
       sourceUrl: '',
       rawText: '',
       masterResumeId: defaultResumeId,
+      contact: {
+        name: '',
+        role: '',
+        email: '',
+        phone: '',
+        linkedinUrl: '',
+      },
     },
     mode: 'onBlur',
   });
@@ -236,6 +246,80 @@ function NewApplicationForm({
               placeholder="Paste the full job description here..."
               className="min-h-48"
             />
+          </div>
+
+          <div className="rounded-md border p-3 space-y-3">
+            <div>
+              <p className="text-sm font-medium">Contact Person</p>
+              <p className="text-xs text-muted-foreground">
+                Optional — recruiter, hiring manager, or anyone you{"'"}re in touch with.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="contactName">Name</Label>
+              <Input
+                id="contactName"
+                maxLength={CONTACT_NAME_MAX}
+                placeholder="e.g. Jane Doe"
+                {...register('contact.name')}
+              />
+              {formState.errors.contact?.name && (
+                <p className="text-xs text-destructive">{formState.errors.contact.name.message}</p>
+              )}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="contactRole">Role</Label>
+                <Input
+                  id="contactRole"
+                  maxLength={CONTACT_ROLE_MAX}
+                  placeholder="Recruiter, Hiring Manager, …"
+                  {...register('contact.role')}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="contactPhone">Phone</Label>
+                <Input
+                  id="contactPhone"
+                  maxLength={CONTACT_PHONE_MAX}
+                  placeholder="+1-555-0100"
+                  {...register('contact.phone')}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="contactEmail">Email</Label>
+                <Input
+                  id="contactEmail"
+                  type="email"
+                  placeholder="jane@acme.com"
+                  {...register('contact.email')}
+                />
+                {formState.errors.contact?.email && (
+                  <p className="text-xs text-destructive">
+                    {formState.errors.contact.email.message}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="contactLinkedin">LinkedIn URL</Label>
+                <Input
+                  id="contactLinkedin"
+                  type="url"
+                  placeholder="https://linkedin.com/in/janedoe"
+                  {...register('contact.linkedinUrl')}
+                />
+                {formState.errors.contact?.linkedinUrl && (
+                  <p className="text-xs text-destructive">
+                    {formState.errors.contact.linkedinUrl.message}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end gap-2">

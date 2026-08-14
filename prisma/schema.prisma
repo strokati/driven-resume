@@ -363,11 +363,12 @@ model Application {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  vacancy           Vacancy            @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
-  masterResume      MasterResume?      @relation(fields: [masterResumeId], references: [id], onDelete: SetNull)
+  vacancy           Vacancy             @relation(fields: [vacancyId], references: [id], onDelete: Cascade)
+  masterResume      MasterResume?       @relation(fields: [masterResumeId], references: [id], onDelete: SetNull)
   resumeDrafts      ResumeDraft[]
   coverLetterDrafts CoverLetterDraft[]
   notes             ApplicationNote[]
+  contact           ApplicationContact?
 
   @@map("applications")
 }
@@ -416,6 +417,22 @@ model ApplicationNote {
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   @@map("application_notes")
+}
+
+model ApplicationContact {
+  id            String   @id @default(cuid())
+  applicationId String   @unique
+  name          String
+  role          String? // "Recruiter", "Hiring Manager", "Engineer", etc.
+  email         String?
+  phone         String?
+  linkedinUrl   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("application_contacts")
 }
 
 // =============================================================================

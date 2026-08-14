@@ -109,6 +109,14 @@ export async function assertApplicationNoteOwned(userId: string, noteId: string)
   return n;
 }
 
+export async function assertApplicationContactOwned(userId: string, contactId: string) {
+  const c = await db.applicationContact.findFirst({
+    where: { id: contactId, application: { vacancy: { userId } } },
+  });
+  if (!c) throw new Error(NOT_FOUND);
+  return c;
+}
+
 export async function assertResumeDraftOwned(userId: string, draftId: string) {
   const d = await db.resumeDraft.findFirst({
     where: { id: draftId, application: { vacancy: { userId } } },

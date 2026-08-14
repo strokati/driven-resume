@@ -2,7 +2,21 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, Mail, MapPin, Globe, Banknote, Trash2, Send } from 'lucide-react';
+import {
+  FileText,
+  Mail,
+  MapPin,
+  Globe,
+  Banknote,
+  Trash2,
+  Send,
+  User,
+  Phone,
+  Link2,
+  Pencil,
+  X,
+  Check,
+} from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -14,9 +28,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { formatSalary } from '@/lib/utils/currency';
-import { createApplicationNote, deleteApplicationNote } from '@/server/actions/applications';
+import {
+  createApplicationNote,
+  updateApplicationNote,
+  deleteApplicationNote,
+} from '@/server/actions/applications';
+import { NOTE_MAX_LENGTH } from '@/lib/validations/applications';
 import type { TrackerRow } from '@/server/queries/tracker';
 
 const statusColors: Record<string, string> = {
@@ -65,6 +85,8 @@ export function TrackerRowDetailPanel({
   const [noteText, setNoteText] = useState('');
   const [isPending, startTransition] = useTransition();
   const [localNotes, setLocalNotes] = useState(row?.notes ?? []);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
 
   // Sync local notes when row changes
   if (row && localNotes !== row.notes) {
@@ -72,6 +94,67 @@ export function TrackerRowDetailPanel({
   }
 
   const open = row !== null;
+  const noteRemaining = NOTE_MAX_LENGTH - noteText.length;
+  const noteInvalid = noteText.trim().length === 0 || noteText.length > NOTE_MAX_LENGTH;
+
+  function handleAddNote() {
+    if (!row || noteInvalid) return;
+    const content = noteText.trim();
+    startTransition(async () => {
+      try {
+        const id = await createApplicationNote(row.id, content);
+        const newNote = {
+          id,
+          content,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        setLocalNotes((prev) => [newNote, ...prev]);
+        setNoteText('');
+      } catch {
+        // toast handled globally if at all
+      }
+    });
+  }
+
+  function startEditNote(id: string, content: string) {
+    setEditingNoteId(id);
+    setEditingContent(content);
+  }
+
+  function cancelEditNote() {
+    setEditingNoteId(null);
+    setEditingContent('');
+  }
+
+  function saveEditNote(id: string) {
+    const trimmed = editingContent.trim();
+    if (!trimmed || trimmed.length > NOTE_MAX_LENGTH) return;
+    startTransition(async () => {
+      try {
+        await updateApplicationNote(id, trimmed);
+        setLocalNotes((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, content: trimmed, updatedAt: new Date() } : n))
+        );
+        setEditingNoteId(null);
+        setEditingContent('');
+      } catch {
+        /* noop */
+      }
+    });
+  }
+
+  function handleDeleteNote(id: string) {
+    if (!window.confirm('Delete this note?')) return;
+    startTransition(async () => {
+      try {
+        await deleteApplicationNote(id);
+        setLocalNotes((prev) => prev.filter((n) => n.id !== id));
+      } catch {
+        /* noop */
+      }
+    });
+  }
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -194,6 +277,12 @@ export function TrackerRowDetailPanel({
                     <MapPin className="h-4 w-4 text-muted-foreground" />
                     <span>{row.location || 'No location specified'}</span>
                   </div>
+                  {row.locationType && (
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-muted-foreground" />
+                      <span>{row.locationType}</span>
+                    </div>
+                  )}
                   {(row.salaryMin != null ||
                     row.salaryMax != null ||
                     row.proposedSalary != null) && (
@@ -225,79 +314,184 @@ export function TrackerRowDetailPanel({
                     </div>
                   )}
                 </div>
+
+                <Card>
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-sm">Contact Person</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => router.push(`/applications/${row.id}`)}
+                      >
+                        {row.contact ? 'Edit' : 'Add'}
+                      </Button>
+                    </div>
+
+                    {row.contact ? (
+                      <div className="space-y-1 text-sm">
+                        <p className="font-medium">{row.contact.name}</p>
+                        {row.contact.role && (
+                          <p className="text-muted-foreground text-xs">{row.contact.role}</p>
+                        )}
+                        {row.contact.email && (
+                          <a
+                            href={`mailto:${row.contact.email}`}
+                            className="flex items-center gap-2 hover:underline"
+                          >
+                            <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="truncate">{row.contact.email}</span>
+                          </a>
+                        )}
+                        {row.contact.phone && (
+                          <a
+                            href={`tel:${row.contact.phone}`}
+                            className="flex items-center gap-2 hover:underline"
+                          >
+                            <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span>{row.contact.phone}</span>
+                          </a>
+                        )}
+                        {row.contact.linkedinUrl && (
+                          <a
+                            href={row.contact.linkedinUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 hover:underline"
+                          >
+                            <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="truncate">LinkedIn profile</span>
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No contact added yet. Click <span className="font-medium">Add</span> to
+                        attach one.
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="notes" className="space-y-3 mt-4">
                 {localNotes.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">No notes yet.</p>
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    No notes yet. Add the first one below.
+                  </p>
                 ) : (
                   localNotes.map((note) => (
-                    <div key={note.id} className="flex items-start gap-2 p-3 rounded-md border">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm">{note.content}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(note.createdAt).toLocaleString()}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 shrink-0"
-                        disabled={isPending}
-                        onClick={() => {
-                          startTransition(async () => {
-                            await deleteApplicationNote(note.id);
-                            setLocalNotes((prev) => prev.filter((n) => n.id !== note.id));
-                          });
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                    <div key={note.id} className="group p-3 rounded-md border">
+                      {editingNoteId === note.id ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={editingContent}
+                            onChange={(e) => setEditingContent(e.target.value)}
+                            rows={3}
+                            autoFocus
+                            maxLength={NOTE_MAX_LENGTH}
+                            className="text-sm"
+                          />
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">
+                              {NOTE_MAX_LENGTH - editingContent.length} remaining
+                            </span>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={cancelEditNote}
+                                disabled={isPending}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => saveEditNote(note.id)}
+                                disabled={
+                                  isPending ||
+                                  editingContent.trim().length === 0 ||
+                                  editingContent.length > NOTE_MAX_LENGTH
+                                }
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm whitespace-pre-wrap break-words">
+                              {note.content}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {new Date(note.createdAt).toLocaleString()}
+                              {new Date(note.updatedAt).getTime() >
+                                new Date(note.createdAt).getTime() + 1000 && (
+                                <span className="ml-1 italic">(edited)</span>
+                              )}
+                            </p>
+                          </div>
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              disabled={isPending}
+                              onClick={() => startEditNote(note.id, note.content)}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              disabled={isPending}
+                              onClick={() => handleDeleteNote(note.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
 
-                <div className="flex gap-2 pt-2">
-                  <input
-                    type="text"
-                    placeholder="Add a note..."
+                <div className="space-y-2 pt-2">
+                  <Textarea
+                    placeholder="Add a note…"
                     value={noteText}
                     onChange={(e) => setNoteText(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && noteText.trim()) {
-                        startTransition(async () => {
-                          await createApplicationNote(row.id, noteText.trim());
-                          const newNote = {
-                            id: `temp-${Date.now()}`,
-                            content: noteText.trim(),
-                            createdAt: new Date(),
-                          };
-                          setLocalNotes((prev) => [newNote, ...prev]);
-                          setNoteText('');
-                        });
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !noteInvalid) {
+                        e.preventDefault();
+                        handleAddNote();
                       }
                     }}
+                    rows={2}
+                    maxLength={NOTE_MAX_LENGTH}
                     disabled={isPending}
+                    className="text-sm"
                   />
-                  <Button
-                    size="sm"
-                    disabled={!noteText.trim() || isPending}
-                    onClick={() => {
-                      if (!noteText.trim()) return;
-                      startTransition(async () => {
-                        await createApplicationNote(row.id, noteText.trim());
-                        const newNote = {
-                          id: `temp-${Date.now()}`,
-                          content: noteText.trim(),
-                          createdAt: new Date(),
-                        };
-                        setLocalNotes((prev) => [newNote, ...prev]);
-                        setNoteText('');
-                      });
-                    }}
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                  </Button>
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={cn(
+                        'text-xs',
+                        noteRemaining < 0 ? 'text-destructive' : 'text-muted-foreground'
+                      )}
+                    >
+                      {noteRemaining} remaining · ⌘+Enter to send
+                    </span>
+                    <Button size="sm" disabled={isPending || noteInvalid} onClick={handleAddNote}>
+                      <Send className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>

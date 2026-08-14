@@ -30,6 +30,8 @@ import {
 import { StatusStepper } from '@/components/shared/StatusStepper';
 import { ExcitementRating } from '@/components/shared/ExcitementRating';
 import { VacancyAnalysisPanel } from '@/components/resume-editor/VacancyAnalysisPanel';
+import { NotesCard } from '@/components/applications/NotesCard';
+import { ContactCard } from '@/components/applications/ContactCard';
 import {
   updateApplicationStatus,
   updateApplicationTracking,
@@ -325,6 +327,12 @@ export function ApplicationDetailView({
               />
             </CardContent>
           </Card>
+
+          {/* Contact Person */}
+          <ContactCard applicationId={application.id} contact={application.contact} />
+
+          {/* Notes */}
+          <NotesCard applicationId={application.id} notes={application.notes} />
 
           {/* Source Resume */}
           <Card>

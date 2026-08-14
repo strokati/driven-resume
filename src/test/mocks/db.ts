@@ -40,11 +40,15 @@ export const db = {
   resumeDraft: createModelMock(),
   coverLetterDraft: createModelMock(),
   applicationNote: createModelMock(),
+  applicationContact: createModelMock(),
   aiProviderConfig: createModelMock(),
   aiCallLog: createModelMock(),
   aiPromptOverride: createModelMock(),
   rateLimit: createModelMock(),
-  $transaction: vi.fn((ops: unknown[]) => Promise.all(ops)),
+  $transaction: vi.fn((arg: unknown) => {
+    if (typeof arg === 'function') return arg(db);
+    return Promise.all(arg as unknown[]);
+  }),
 };
 
 vi.mock('@/lib/db/client', () => ({ db }));

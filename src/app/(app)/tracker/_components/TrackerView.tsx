@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { TrackerTable } from '@/components/tracker/TrackerTable';
 import { TrackerKanban } from '@/components/tracker/TrackerKanban';
 import { TrackerRowDetailPanel } from '@/components/tracker/TrackerRowDetailPanel';
+import { TrackerExportMenu } from '@/components/tracker/TrackerExportMenu';
 import type { TrackerRow } from '@/server/queries/tracker';
 import { ApplicationStatusValues } from '@/lib/validations/applications';
 
@@ -128,25 +129,28 @@ export function TrackerView({ initialData }: { initialData: TrackerRow[] }) {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Application Tracker</h1>
 
-        <div className="flex items-center border rounded-md p-0.5">
-          <Button
-            variant={view === 'table' ? 'secondary' : 'ghost'}
-            size="sm"
-            className="h-7 px-2"
-            onClick={() => handleViewChange('table')}
-          >
-            <Table className="h-3.5 w-3.5 mr-1" />
-            Table
-          </Button>
-          <Button
-            variant={view === 'kanban' ? 'secondary' : 'ghost'}
-            size="sm"
-            className="h-7 px-2"
-            onClick={() => handleViewChange('kanban')}
-          >
-            <Kanban className="h-3.5 w-3.5 mr-1" />
-            Kanban
-          </Button>
+        <div className="flex items-center gap-2">
+          <TrackerExportMenu rowCount={rows.length} />
+          <div className="flex items-center border rounded-md p-0.5">
+            <Button
+              variant={view === 'table' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => handleViewChange('table')}
+            >
+              <Table className="h-3.5 w-3.5 mr-1" />
+              Table
+            </Button>
+            <Button
+              variant={view === 'kanban' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => handleViewChange('kanban')}
+            >
+              <Kanban className="h-3.5 w-3.5 mr-1" />
+              Kanban
+            </Button>
+          </div>
         </div>
       </div>
 

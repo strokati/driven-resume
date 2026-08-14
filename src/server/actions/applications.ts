@@ -9,8 +9,10 @@ import {
   UpdateApplicationStatusSchema,
   UpdateExcitementSchema,
   UpdateTrackingSchema,
+  NoteSchema,
+  ContactPersonSchema,
 } from '@/lib/validations/applications';
-import type { CreateApplicationInput } from '@/lib/validations/applications';
+import type { CreateApplicationInput, ContactPersonInput } from '@/lib/validations/applications';
 import { assertApplicationOwned, assertApplicationNoteOwned } from './_ownership';
 
 async function requireAuth(): Promise<string> {
@@ -29,24 +31,42 @@ export async function createApplication(data: CreateApplicationInput): Promise<s
   if (!resume) throw new Error('Invalid master resume.');
 
   try {
-    const vacancy = await db.vacancy.create({
-      data: {
-        userId,
-        companyName: validated.companyName,
-        jobTitle: validated.jobTitle,
-        location: validated.location || null,
-        locationType: validated.locationType || null,
-        salaryMin: validated.salaryMin ? parseInt(validated.salaryMin, 10) || null : null,
-        salaryMax: validated.salaryMax ? parseInt(validated.salaryMax, 10) || null : null,
-        currency: validated.currency || 'USD',
-        sourceUrl: validated.sourceUrl || null,
-        rawText: validated.rawText || null,
-      },
+    const applicationId = await db.$transaction(async (tx) => {
+      const vacancy = await tx.vacancy.create({
+        data: {
+          userId,
+          companyName: validated.companyName,
+          jobTitle: validated.jobTitle,
+          location: validated.location || null,
+          locationType: validated.locationType || null,
+          salaryMin: validated.salaryMin ? parseInt(validated.salaryMin, 10) || null : null,
+          salaryMax: validated.salaryMax ? parseInt(validated.salaryMax, 10) || null : null,
+          currency: validated.currency || 'USD',
+          sourceUrl: validated.sourceUrl || null,
+          rawText: validated.rawText || null,
+        },
+      });
+      const application = await tx.application.create({
+        data: { vacancyId: vacancy.id, masterResumeId: validated.masterResumeId },
+      });
+
+      if (validated.contact && validated.contact.name.trim()) {
+        const c = validated.contact;
+        await tx.applicationContact.create({
+          data: {
+            applicationId: application.id,
+            name: c.name,
+            role: c.role || null,
+            email: c.email || null,
+            phone: c.phone || null,
+            linkedinUrl: c.linkedinUrl || null,
+          },
+        });
+      }
+
+      return application.id;
     });
-    const application = await db.application.create({
-      data: { vacancyId: vacancy.id, masterResumeId: validated.masterResumeId },
-    });
-    return application.id;
+    return applicationId;
   } catch {
     throw new Error('Failed to create application.');
   } finally {
@@ -131,28 +151,96 @@ export async function deleteApplication(id: string): Promise<void> {
   redirect('/applications');
 }
 
-export async function createApplicationNote(applicationId: string, content: string): Promise<void> {
+export async function createApplicationNote(
+  applicationId: string,
+  content: string
+): Promise<string> {
   const userId = await requireAuth();
   await assertApplicationOwned(userId, applicationId);
   if (!content.trim()) throw new Error('Note content cannot be empty.');
   try {
-    await db.applicationNote.create({
+    const note = await db.applicationNote.create({
       data: { applicationId, content: content.trim() },
+      select: { id: true },
     });
+    revalidatePath('/tracker');
+    revalidatePath(`/applications/${applicationId}`);
+    return note.id;
   } catch {
     throw new Error('Failed to create note.');
   }
+}
+
+export async function updateApplicationNote(id: string, content: string): Promise<void> {
+  const userId = await requireAuth();
+  const note = await assertApplicationNoteOwned(userId, id);
+  const validated = NoteSchema.parse({ content });
+  try {
+    await db.applicationNote.update({
+      where: { id },
+      data: { content: validated.content },
+    });
+  } catch {
+    throw new Error('Failed to update note.');
+  }
   revalidatePath('/tracker');
+  revalidatePath(`/applications/${note.applicationId}`);
 }
 
 export async function deleteApplicationNote(id: string): Promise<void> {
   const userId = await requireAuth();
-  await assertApplicationNoteOwned(userId, id);
+  const note = await assertApplicationNoteOwned(userId, id);
   try {
     await db.applicationNote.delete({ where: { id } });
   } catch {
     throw new Error('Failed to delete note.');
   }
+  revalidatePath('/tracker');
+  revalidatePath(`/applications/${note.applicationId}`);
+}
+
+export async function upsertApplicationContact(
+  applicationId: string,
+  data: ContactPersonInput
+): Promise<void> {
+  const userId = await requireAuth();
+  await assertApplicationOwned(userId, applicationId);
+  const validated = ContactPersonSchema.parse(data);
+  try {
+    await db.applicationContact.upsert({
+      where: { applicationId },
+      create: {
+        applicationId,
+        name: validated.name,
+        role: validated.role || null,
+        email: validated.email || null,
+        phone: validated.phone || null,
+        linkedinUrl: validated.linkedinUrl || null,
+      },
+      update: {
+        name: validated.name,
+        role: validated.role || null,
+        email: validated.email || null,
+        phone: validated.phone || null,
+        linkedinUrl: validated.linkedinUrl || null,
+      },
+    });
+  } catch {
+    throw new Error('Failed to save contact.');
+  }
+  revalidatePath(`/applications/${applicationId}`);
+  revalidatePath('/tracker');
+}
+
+export async function deleteApplicationContact(applicationId: string): Promise<void> {
+  const userId = await requireAuth();
+  await assertApplicationOwned(userId, applicationId);
+  try {
+    await db.applicationContact.deleteMany({ where: { applicationId } });
+  } catch {
+    throw new Error('Failed to delete contact.');
+  }
+  revalidatePath(`/applications/${applicationId}`);
   revalidatePath('/tracker');
 }
 
