@@ -40,9 +40,17 @@ export function useResumeSuggestions(applicationId: string) {
 
         const jsonMatch = fullText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-          setSuggestions(JSON.parse(jsonMatch[0]));
+          try {
+            setSuggestions(JSON.parse(jsonMatch[0]));
+          } catch {
+            throw new Error(
+              'The AI response was incomplete (likely a token limit). Please try again.'
+            );
+          }
         } else {
-          throw new Error('Could not parse suggestions response');
+          throw new Error(
+            'The AI response was incomplete (likely a token limit). Please try again.'
+          );
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Suggestions failed');

@@ -40,6 +40,9 @@ export async function runAtsCheck(userId: string, resumeDraftId: string, provide
     model,
     system,
     prompt,
+    // Raise above the 4096 provider default — the ATS report JSON
+    // (scores + recommendations + keyword coverage) can exceed it.
+    maxOutputTokens: 8192,
     onFinish: async (event) => {
       const durationMs = Date.now() - startTime;
       const usage = event.totalUsage;
@@ -55,9 +58,19 @@ export async function runAtsCheck(userId: string, resumeDraftId: string, provide
             tokensIn: usage.inputTokens ?? null,
             tokensOut: usage.outputTokens ?? null,
             durationMs,
-            error: null,
+            error:
+              event.finishReason === 'length'
+                ? 'Output truncated: token limit reached before JSON completed.'
+                : null,
           },
         });
+
+        if (event.finishReason === 'length') {
+          console.error(
+            `ats-check output truncated at ${usage.outputTokens} tokens (draftId=${resumeDraftId})`
+          );
+          return;
+        }
 
         const text = event.text;
         if (text) {

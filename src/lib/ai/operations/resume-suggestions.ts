@@ -113,6 +113,10 @@ export async function getResumeSuggestions(
     model,
     system,
     prompt,
+    // Without an explicit limit the provider default (4096) silently
+    // truncates the suggestions JSON mid-string for large resumes —
+    // surfaced to users as "Could not parse suggestions response".
+    maxOutputTokens: 8192,
     onFinish: async (event) => {
       const durationMs = Date.now() - startTime;
       const usage = event.totalUsage;
@@ -127,9 +131,19 @@ export async function getResumeSuggestions(
             tokensIn: usage.inputTokens ?? null,
             tokensOut: usage.outputTokens ?? null,
             durationMs,
-            error: null,
+            error:
+              event.finishReason === 'length'
+                ? 'Output truncated: token limit reached before JSON completed.'
+                : null,
           },
         });
+
+        if (event.finishReason === 'length') {
+          console.error(
+            `resume-suggestions output truncated at ${usage.outputTokens} tokens (applicationId=${applicationId})`
+          );
+          return;
+        }
 
         const text = event.text;
         if (text) {
