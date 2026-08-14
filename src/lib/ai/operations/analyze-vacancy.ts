@@ -41,6 +41,9 @@ export async function analyzeVacancy(userId: string, applicationId: string, prov
     model,
     system,
     prompt,
+    // Raise above the 4096 provider default — the vacancy analysis JSON
+    // can exceed it on long postings and get truncated mid-string.
+    maxOutputTokens: 8192,
     onFinish: async (event) => {
       const durationMs = Date.now() - startTime;
       const usage = event.totalUsage;
@@ -56,9 +59,19 @@ export async function analyzeVacancy(userId: string, applicationId: string, prov
             tokensIn: usage.inputTokens ?? null,
             tokensOut: usage.outputTokens ?? null,
             durationMs,
-            error: null,
+            error:
+              event.finishReason === 'length'
+                ? 'Output truncated: token limit reached before JSON completed.'
+                : null,
           },
         });
+
+        if (event.finishReason === 'length') {
+          console.error(
+            `analyze-vacancy output truncated at ${usage.outputTokens} tokens (vacancyId=${application.vacancyId})`
+          );
+          return;
+        }
 
         const text = event.text;
         if (text) {
