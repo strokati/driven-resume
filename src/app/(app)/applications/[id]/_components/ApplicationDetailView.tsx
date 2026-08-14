@@ -2,16 +2,20 @@
 
 import { useTransition, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  ExternalLink,
-  Globe,
-  Trash2,
-  ShieldCheck,
-  BookOpen,
-  Pencil,
+  ArrowLeft,
   ChevronRight,
   ChevronDown,
+  Download,
+  ExternalLink,
+  FileText,
+  Globe,
+  Loader2,
+  Pencil,
+  Trash2,
+  BookOpen,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,12 +27,20 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { StatusStepper } from '@/components/shared/StatusStepper';
 import { ExcitementRating } from '@/components/shared/ExcitementRating';
 import { VacancyAnalysisPanel } from '@/components/resume-editor/VacancyAnalysisPanel';
 import { NotesCard } from '@/components/applications/NotesCard';
 import { ContactCard } from '@/components/applications/ContactCard';
+import { AtsRing } from '@/components/shared/AtsRing';
+import { CollapsibleText } from '@/components/shared/CollapsibleText';
 import {
   PropertyGroup,
   PropertyRow,
@@ -40,10 +52,12 @@ import {
   deleteApplication,
 } from '@/server/actions/applications';
 import { ChangeResumeDialog } from '@/components/applications/ChangeResumeDialog';
+import { useExport } from '@/hooks/use-export';
 import type { ApplicationDetail } from '@/types/applications';
 import type { ApplicationStatus } from '@/lib/validations/applications';
 import { formatSalary } from '@/lib/utils/currency';
-import { statusDotColors, statusLabels } from '@/lib/utils/status';
+import { statusDotColors } from '@/lib/utils/status';
+import { nextMilestone, stagePhrase } from '@/lib/utils/stage';
 import type { MasterResumeSummary } from '@/types/master-resume';
 
 type AiConfig = { providerId: string; model: string; isDefault: boolean; apiKey: string };
@@ -51,27 +65,6 @@ type AiConfig = { providerId: string; model: string; isDefault: boolean; apiKey:
 function formatDateForInput(date: Date | string | null): string {
   if (!date) return '';
   return new Date(date).toISOString().split('T')[0];
-}
-
-function formatShortDate(date: Date | string | null): string {
-  if (!date) return '';
-  return new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-function nextStepHint(
-  status: string,
-  interviewDate: Date | null,
-  offerDate: Date | null
-): string | null {
-  const now = Date.now();
-  if (interviewDate && new Date(interviewDate).getTime() > now) {
-    return `Interview ${formatShortDate(interviewDate)}`;
-  }
-  if (offerDate && new Date(offerDate).getTime() > now) {
-    return `Offer ${formatShortDate(offerDate)}`;
-  }
-  if (status === 'applied' || status === 'screening') return 'Awaiting response';
-  return null;
 }
 
 export function ApplicationDetailView({
@@ -88,6 +81,8 @@ export function ApplicationDetailView({
   const [showChangeResumeDialog, setShowChangeResumeDialog] = useState(false);
   const [salaryExpanded, setSalaryExpanded] = useState(false);
   const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
+  const router = useRouter();
+  const { exportResume, isExporting } = useExport();
   const { vacancy } = application;
 
   const activeResume =
@@ -96,7 +91,10 @@ export function ApplicationDetailView({
     application.coverLetterDrafts.find((d) => d.isActive) ?? application.coverLetterDrafts[0];
 
   const status = application.status as ApplicationStatus;
-  const hint = nextStepHint(status, application.interviewDate, application.offerDate);
+  const milestone = nextMilestone(status, application.interviewDate, application.offerDate);
+  const atsScore = activeResume?.atsScore
+    ? ((activeResume.atsScore as { score?: number }).score ?? null)
+    : null;
 
   const salarySummary =
     application.salaryMin != null || application.salaryMax != null
@@ -150,13 +148,97 @@ export function ApplicationDetailView({
     });
   }
 
+  function handleExport(format: 'pdf' | 'docx') {
+    if (!activeResume) return;
+    startTransition(async () => {
+      try {
+        await exportResume(activeResume.id, format);
+        toast.success(`${format.toUpperCase()} export ready`);
+      } catch {
+        toast.error('Export failed. Please try again.');
+      }
+    });
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between pb-2">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{vacancy.jobTitle}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{vacancy.companyName}</p>
+      {/* Sticky page header */}
+      <div className="sticky top-0 z-20 -mx-6 px-6 py-3 bg-background/95 backdrop-blur border-b">
+        <div className="flex items-center justify-between gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-muted-foreground"
+            onClick={() => router.push('/applications')}
+          >
+            <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+            Applications
+          </Button>
+
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button variant="outline" size="sm" disabled={!activeResume || isExporting} />
+                }
+              >
+                {isExporting ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Export
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled={!activeResume} onClick={() => handleExport('pdf')}>
+                  <FileText className="h-3.5 w-3.5 mr-2" />
+                  PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!activeResume} onClick={() => handleExport('docx')}>
+                  <FileText className="h-3.5 w-3.5 mr-2" />
+                  Word
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Link href={`/applications/${application.id}/resume`}>
+              <Button size="sm">{activeResume ? 'Open Resume' : 'Create Resume'}</Button>
+            </Link>
+          </div>
         </div>
+
+        <div className="flex items-center gap-3 flex-wrap mt-2">
+          <h1 className="text-xl font-bold tracking-tight truncate">{vacancy.jobTitle}</h1>
+          <span className="text-sm text-muted-foreground truncate">{vacancy.companyName}</span>
+        </div>
+
+        {/* Status chip with stepper popover */}
+        <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
+          <PopoverTrigger
+            render={
+              <button
+                type="button"
+                className="group inline-flex items-center gap-2 rounded-md px-1.5 py-0.5 -ml-1.5 text-sm hover:bg-muted/50 transition-colors"
+              />
+            }
+          >
+            <span
+              className={`h-2.5 w-2.5 rounded-full shrink-0 ${
+                statusDotColors[status] ?? 'bg-slate-400'
+              }`}
+            />
+            <span className="font-medium">{stagePhrase(status, application.updatedAt)}</span>
+            {milestone && (
+              <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                <ChevronRight className="h-3 w-3" />
+                {milestone.label}
+              </span>
+            )}
+            <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-72 p-3">
+            <StatusStepper currentStatus={status} onChange={handleStatusChange} />
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
@@ -208,9 +290,7 @@ export function ApplicationDetailView({
 
               {vacancy.rawText && (
                 <PropertyGroup label="Job Posting">
-                  <pre className="max-h-80 overflow-auto rounded-xl bg-muted/50 p-4 text-xs leading-relaxed whitespace-pre-wrap font-mono">
-                    {vacancy.rawText}
-                  </pre>
+                  <CollapsibleText text={vacancy.rawText} label="Show full posting" />
                 </PropertyGroup>
               )}
             </CardContent>
@@ -231,35 +311,6 @@ export function ApplicationDetailView({
         <div>
           <Card>
             <CardContent className="p-4">
-              {/* Status header */}
-              <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
-                <PopoverTrigger
-                  render={
-                    <button
-                      type="button"
-                      className="flex items-center gap-2 w-full text-left group -mx-1 px-1 py-2 rounded-md hover:bg-muted/50 transition-colors"
-                    />
-                  }
-                >
-                  <span
-                    className={`h-2.5 w-2.5 rounded-full shrink-0 ${
-                      statusDotColors[status] ?? 'bg-slate-400'
-                    }`}
-                  />
-                  <span className="text-sm font-medium">{statusLabels[status] ?? status}</span>
-                  {hint && (
-                    <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                      <ChevronRight className="h-3 w-3" />
-                      {hint}
-                    </span>
-                  )}
-                  <Pencil className="h-3 w-3 ml-auto text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-72 p-3">
-                  <StatusStepper currentStatus={status} onChange={handleStatusChange} />
-                </PopoverContent>
-              </Popover>
-
               {/* Tracking */}
               <PropertyGroup label="Tracking">
                 <PropertyRowClickable
@@ -352,6 +403,7 @@ export function ApplicationDetailView({
                   label="Resume"
                   value={
                     <span className="flex items-center gap-1.5 min-w-0">
+                      {atsScore != null && <AtsRing score={atsScore} size={24} />}
                       <span className="truncate">{activeResume ? activeResume.name : 'None'}</span>
                       {activeResume?.status === 'ready' && (
                         <Badge
@@ -360,12 +412,6 @@ export function ApplicationDetailView({
                         >
                           ✓ ready
                         </Badge>
-                      )}
-                      {activeResume?.atsScore && (
-                        <span className="flex items-center gap-0.5 text-[0.6rem] text-muted-foreground shrink-0">
-                          <ShieldCheck className="h-3 w-3" />
-                          {(activeResume.atsScore as { score?: number }).score ?? ''}/100
-                        </span>
                       )}
                     </span>
                   }
