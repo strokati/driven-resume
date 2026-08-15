@@ -87,7 +87,7 @@ function keyDate(row: TrackerRow): { label: string; date: Date | null } | null {
   }
 }
 
-type SortKey = 'dateSaved' | 'companyName' | 'status';
+type SortKey = 'dateSaved' | 'companyName' | 'status' | 'serialNumber' | 'dateApplied';
 type SortDir = 'asc' | 'desc' | null;
 
 export function TrackerTable({
