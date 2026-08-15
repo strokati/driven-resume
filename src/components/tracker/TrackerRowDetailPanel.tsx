@@ -162,7 +162,12 @@ export function TrackerRowDetailPanel({
         {row && (
           <>
             <SheetHeader>
-              <SheetTitle>{row.jobTitle}</SheetTitle>
+              <SheetTitle>
+                <span className="text-muted-foreground font-normal mr-1.5">
+                  #{row.serialNumber}
+                </span>
+                {row.jobTitle}
+              </SheetTitle>
               <SheetDescription>{row.companyName}</SheetDescription>
               <div className="flex items-center gap-2 mt-1">
                 <Badge

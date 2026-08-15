@@ -2,6 +2,7 @@ import { db } from '@/lib/db/client';
 
 export type TrackerRow = {
   id: string;
+  serialNumber: number;
   jobTitle: string;
   companyName: string;
   salaryMin: number | null;
@@ -56,7 +57,7 @@ export type TrackerExportRow = {
 
 export async function getTrackerData(userId: string): Promise<TrackerRow[]> {
   const applications = await db.application.findMany({
-    where: { vacancy: { userId } },
+    where: { userId },
     include: {
       vacancy: {
         select: {
@@ -110,6 +111,7 @@ export async function getTrackerData(userId: string): Promise<TrackerRow[]> {
 
     return {
       id: app.id,
+      serialNumber: app.serialNumber,
       jobTitle: app.vacancy.jobTitle,
       companyName: app.vacancy.companyName,
       salaryMin: app.salaryMin,
@@ -139,7 +141,7 @@ export async function getTrackerData(userId: string): Promise<TrackerRow[]> {
 
 export async function getTrackerExportData(userId: string): Promise<TrackerExportRow[]> {
   const applications = await db.application.findMany({
-    where: { vacancy: { userId } },
+    where: { userId },
     select: {
       dateApplied: true,
       status: true,

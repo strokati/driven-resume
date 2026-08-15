@@ -42,9 +42,12 @@ export function KanbanCard({
             <p className="font-medium text-sm truncate">{row.companyName}</p>
             <p className="text-xs text-muted-foreground truncate">{row.jobTitle}</p>
           </div>
-          {row.resumeStatus === 'ready' && (
-            <Circle className="h-2.5 w-2.5 fill-green-500 text-green-500 shrink-0 mt-1" />
-          )}
+          <div className="flex items-center gap-1 shrink-0 mt-1">
+            {row.resumeStatus === 'ready' && (
+              <Circle className="h-2.5 w-2.5 fill-green-500 text-green-500" />
+            )}
+            <span className="text-[0.6rem] text-muted-foreground">#{row.serialNumber}</span>
+          </div>
         </div>
 
         {row.location && (
