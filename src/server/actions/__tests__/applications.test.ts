@@ -32,6 +32,7 @@ describe('createApplication', () => {
   it('creates a Vacancy and Application, returns applicationId', async () => {
     db.masterResume.findFirst.mockResolvedValue({ id: 'resume-1' });
     db.vacancy.create.mockResolvedValue({ id: 'vac-1' });
+    db.application.aggregate.mockResolvedValue({ _max: { serialNumber: 41 } });
     db.application.create.mockResolvedValue({ id: 'app-1' });
 
     const id = await createApplication({
@@ -44,6 +45,11 @@ describe('createApplication', () => {
     expect(db.vacancy.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ companyName: 'Acme', jobTitle: 'Engineer' }),
+      })
+    );
+    expect(db.application.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ serialNumber: 42, userId: 'local-user' }),
       })
     );
     expect(revalidatePath).toHaveBeenCalledWith('/applications');
