@@ -87,10 +87,72 @@ describe('UserArchiveSchema', () => {
   });
 
   it('exposes ARCHIVE_VERSION as a constant matching the schema', () => {
-    expect(ARCHIVE_VERSION).toBe(1);
+    expect(ARCHIVE_VERSION).toBe(2);
     const result = UserArchiveSchema.safeParse(sampleArchive);
     if (result.success) {
       expect(result.data.version).toBe(ARCHIVE_VERSION);
     }
+  });
+
+  it('still accepts v1 archives (pre-contact) for restore', () => {
+    const v1 = { ...sampleArchive, version: 1 };
+    const result = UserArchiveSchema.safeParse(v1);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an application with a contact', () => {
+    const withContact = {
+      ...sampleArchive,
+      applications: sampleArchive.applications.map((app, i) =>
+        i === 0
+          ? {
+              ...app,
+              contact: {
+                id: 'contact-1',
+                applicationId: app.id,
+                name: 'Jane Doe',
+                role: 'Recruiter',
+                email: 'jane@acme.com',
+                phone: null,
+                linkedinUrl: null,
+                createdAt: '2026-08-15T10:00:00.000Z',
+                updatedAt: '2026-08-15T10:00:00.000Z',
+              },
+            }
+          : app
+      ),
+    };
+    const result = UserArchiveSchema.safeParse(withContact);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.applications[0].contact?.name).toBe('Jane Doe');
+    }
+  });
+
+  it('defaults a missing contact to null (v1 archives without the field)', () => {
+    const noContact = {
+      ...sampleArchive,
+      version: 1 as const,
+      applications: sampleArchive.applications.map(({ contact: _c, ...app }) => {
+        void _c;
+        return app;
+      }),
+    };
+    const result = UserArchiveSchema.safeParse(noContact);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.applications[0].contact).toBeNull();
+    }
+  });
+
+  it('rejects a malformed contact (wrong field type)', () => {
+    const badContact = {
+      ...sampleArchive,
+      applications: sampleArchive.applications.map((app, i) =>
+        i === 0 ? { ...app, contact: { ...app, name: 42 } } : app
+      ),
+    };
+    const result = UserArchiveSchema.safeParse(badContact);
+    expect(result.success).toBe(false);
   });
 });

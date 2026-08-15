@@ -288,6 +288,7 @@ function buildApplicationCreate(input: LooseRecord): LooseRecord {
     resumeDrafts = [],
     coverLetterDrafts = [],
     notes = [],
+    contact = null,
     vacancy: _vacancy,
     masterResume: _masterResume,
     ...scalarFields
@@ -306,6 +307,7 @@ function buildApplicationCreate(input: LooseRecord): LooseRecord {
     notes: {
       create: (notes as LooseRecord[]).map((n) => stripFk(n, 'applicationId')),
     },
+    ...(contact ? { contact: { create: stripFk(contact as LooseRecord, 'applicationId') } } : {}),
   };
 }
 
