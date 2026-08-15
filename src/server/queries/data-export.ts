@@ -50,6 +50,7 @@ export async function buildUserArchive(userId: string): Promise<UserArchive> {
         resumeDrafts: { orderBy: { createdAt: 'asc' } },
         coverLetterDrafts: { orderBy: { createdAt: 'asc' } },
         notes: { orderBy: { createdAt: 'asc' } },
+        contact: true,
       },
       orderBy: { dateSaved: 'desc' },
     }),

@@ -134,6 +134,17 @@ export const sampleArchive: UserArchive = {
           updatedAt: '2026-02-03T00:00:00.000Z',
         },
       ],
+      contact: {
+        id: 'contact-1',
+        applicationId: 'application-1',
+        name: 'Jane Doe',
+        role: 'Recruiter',
+        email: 'jane@acme.com',
+        phone: null,
+        linkedinUrl: null,
+        createdAt: '2026-02-03T00:00:00.000Z',
+        updatedAt: '2026-02-03T00:00:00.000Z',
+      },
     },
   ],
   aiProviderConfigs: [

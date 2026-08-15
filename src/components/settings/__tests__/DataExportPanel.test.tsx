@@ -19,6 +19,7 @@ vi.mock('@/server/actions/data-export', () => ({
 
 import { DataExportPanel } from '@/components/settings/DataExportPanel';
 import { sampleArchiveJson } from '@/test/fixtures/data-export';
+import { ARCHIVE_VERSION } from '@/lib/validations/data-export';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -96,7 +97,7 @@ describe('DataExportPanel — import preview', () => {
 
     // FileReader.readAsText fires onload async — use findBy to wait.
     const versionLabel = await screen.findByText(/archive version/i);
-    expect(versionLabel.parentElement).toHaveTextContent('1');
+    expect(versionLabel.parentElement).toHaveTextContent(String(ARCHIVE_VERSION));
 
     const contents = await screen.findByText(/contents:/i);
     expect(contents).toHaveTextContent(/1 master resume/i);

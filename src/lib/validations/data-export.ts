@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ARCHIVE_VERSION = 1 as const;
+export const ARCHIVE_VERSION = 2 as const;
 
 /**
  * Shape of a Reeesume data-export archive.
@@ -280,6 +280,20 @@ const ApplicationNoteArchiveSchema = z
   })
   .strict();
 
+const ApplicationContactArchiveSchema = z
+  .object({
+    id: z.string(),
+    applicationId: z.string(),
+    name: z.string(),
+    role: nullableString,
+    email: nullableString,
+    phone: nullableString,
+    linkedinUrl: nullableString,
+    createdAt: isoDate,
+    updatedAt: isoDate,
+  })
+  .strict();
+
 const ApplicationArchiveSchema = z
   .object({
     id: z.string(),
@@ -301,6 +315,7 @@ const ApplicationArchiveSchema = z
     resumeDrafts: z.array(ResumeDraftArchiveSchema).default([]),
     coverLetterDrafts: z.array(CoverLetterDraftArchiveSchema).default([]),
     notes: z.array(ApplicationNoteArchiveSchema).default([]),
+    contact: ApplicationContactArchiveSchema.nullable().default(null),
   })
   .strict();
 
@@ -350,7 +365,8 @@ const AiPromptOverrideArchiveSchema = z
 
 export const UserArchiveSchema = z
   .object({
-    version: z.literal(ARCHIVE_VERSION),
+    // Accept v1 archives (pre-contact) for restore; exports write ARCHIVE_VERSION.
+    version: z.union([z.literal(ARCHIVE_VERSION), z.literal(1)]),
     appVersion: z.string(),
     createdAt: isoDate,
     userId: z.string(),
