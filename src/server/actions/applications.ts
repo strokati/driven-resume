@@ -46,8 +46,17 @@ export async function createApplication(data: CreateApplicationInput): Promise<s
           rawText: validated.rawText || null,
         },
       });
+      const last = await tx.application.aggregate({
+        _max: { serialNumber: true },
+        where: { userId },
+      });
       const application = await tx.application.create({
-        data: { vacancyId: vacancy.id, masterResumeId: validated.masterResumeId },
+        data: {
+          vacancyId: vacancy.id,
+          userId,
+          masterResumeId: validated.masterResumeId,
+          serialNumber: (last._max.serialNumber ?? 0) + 1,
+        },
       });
 
       if (validated.contact && validated.contact.name.trim()) {

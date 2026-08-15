@@ -87,7 +87,7 @@ function keyDate(row: TrackerRow): { label: string; date: Date | null } | null {
   }
 }
 
-type SortKey = 'dateSaved' | 'companyName' | 'status';
+type SortKey = 'dateSaved' | 'companyName' | 'status' | 'serialNumber' | 'dateApplied';
 type SortDir = 'asc' | 'desc' | null;
 
 export function TrackerTable({
@@ -130,6 +130,7 @@ export function TrackerTable({
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-[50px]">#</TableHead>
             <TableHead className="w-[180px]">Job Position</TableHead>
             <SortableHead
               label="Company"
@@ -166,7 +167,7 @@ export function TrackerTable({
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={12} className="h-24 text-center text-muted-foreground">
                 No applications found.
               </TableCell>
             </TableRow>
@@ -177,6 +178,7 @@ export function TrackerTable({
                 className={cn('cursor-pointer hover:bg-muted/50')}
                 onClick={() => onRowClick(row)}
               >
+                <TableCell className="text-muted-foreground text-xs">#{row.serialNumber}</TableCell>
                 <TableCell className="font-medium truncate max-w-[180px]">{row.jobTitle}</TableCell>
                 <TableCell className="truncate max-w-[150px]">{row.companyName}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">
