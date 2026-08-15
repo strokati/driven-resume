@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -71,7 +72,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-muted/40">
+      <Image
+        src="/logo-wordmark-320.png"
+        alt="Reeesume"
+        width={320}
+        height={60}
+        priority
+        className="h-14 w-auto"
+      />
       <Card className="w-full max-w-sm">
         {step === 'email' ? (
           <>
