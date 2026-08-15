@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
@@ -20,9 +21,14 @@ export function Sidebar() {
   return (
     <aside className="flex w-60 flex-col border-r bg-sidebar">
       <div className="flex h-16 items-center gap-2.5 px-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <FileText className="h-4 w-4" />
-        </div>
+        <Image
+          src="/logo-icon-64.png"
+          alt="Reeesume"
+          width={32}
+          height={32}
+          className="h-8 w-8"
+          priority
+        />
         <span className="text-base font-semibold tracking-tight">Reeesume</span>
       </div>
       <nav className="flex-1 space-y-1 px-3 pt-2">
