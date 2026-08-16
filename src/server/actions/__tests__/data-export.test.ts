@@ -127,6 +127,52 @@ describe('restoreUserArchive — happy path', () => {
     expect(vacancyCall.data.userId).toBe('local-user');
   });
 
+  it('rebinds applications to the current userId and assigns serial numbers', async () => {
+    await restoreUserArchive(sampleArchiveJson);
+    for (const call of db.application.create.mock.calls) {
+      const args = call[0] as any;
+      expect(args.data.userId).toBe('local-user');
+      expect(Number.isInteger(args.data.serialNumber)).toBe(true);
+      expect(args.data.serialNumber).toBeGreaterThan(0);
+    }
+  });
+
+  it('regenerates serial numbers in save order for pre-p25 archives', async () => {
+    await restoreUserArchive(sampleArchiveJson);
+    const serials = db.application.create.mock.calls.map(
+      (call) => (call[0] as any).data.serialNumber
+    );
+    expect(serials).toEqual([1]);
+  });
+
+  it('preserves serial numbers from archives that have them', async () => {
+    const archive = JSON.parse(sampleArchiveJson);
+    archive.applications = [
+      { ...archive.applications[0], serialNumber: 41, userId: 'other-user' },
+      {
+        ...archive.applications[0],
+        id: 'application-2',
+        vacancyId: 'vacancy-2',
+        dateSaved: '2026-01-15T00:00:00.000Z',
+        resumeDrafts: [],
+        coverLetterDrafts: [],
+        notes: [],
+        contact: null,
+        serialNumber: 7,
+      },
+    ];
+    await restoreUserArchive(JSON.stringify(archive));
+    const byId = new Map(
+      db.application.create.mock.calls.map((call) => {
+        const args = call[0] as any;
+        return [args.data.id, args.data.serialNumber];
+      })
+    );
+    expect(byId.get('application-1')).toBe(41);
+    expect(byId.get('application-2')).toBe(7);
+    expect(db.application.create.mock.calls[0][0].data.userId).toBe('local-user');
+  });
+
   it('uses createMany for aiProviderConfigs, aiCallLogs, aiPromptOverrides', async () => {
     await restoreUserArchive(sampleArchiveJson);
     expect(db.aiProviderConfig.createMany).toHaveBeenCalledTimes(1);

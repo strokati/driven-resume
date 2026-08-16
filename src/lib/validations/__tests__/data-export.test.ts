@@ -61,6 +61,31 @@ describe('UserArchiveSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('accepts applications with optional userId and serialNumber (post-p25 archives)', () => {
+    const withSerials = {
+      ...sampleArchive,
+      applications: sampleArchive.applications.map((app) => ({
+        ...app,
+        userId: 'archive-user',
+        serialNumber: 41,
+      })),
+    };
+    const result = UserArchiveSchema.safeParse(withSerials);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a non-integer serialNumber', () => {
+    const tampered = {
+      ...sampleArchive,
+      applications: sampleArchive.applications.map((app) => ({
+        ...app,
+        serialNumber: 'forty-one',
+      })),
+    };
+    const result = UserArchiveSchema.safeParse(tampered);
+    expect(result.success).toBe(false);
+  });
+
   it('rejects a malicious archive with injected isDefault: true', () => {
     // Even though isDefault is a known field, the strict schema exposes it as
     // a boolean — an attacker cannot escalate privileges by claiming default

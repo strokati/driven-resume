@@ -298,6 +298,10 @@ const ApplicationArchiveSchema = z
   .object({
     id: z.string(),
     vacancyId: z.string(),
+    // Optional: pre-p25 archives lack both. userId is overridden on restore;
+    // serialNumber is preserved when present, regenerated in save order otherwise.
+    userId: z.string().optional(),
+    serialNumber: z.number().int().positive().optional(),
     masterResumeId: nullableString,
     status: z.string(),
     salaryMin: nullableNumber,
