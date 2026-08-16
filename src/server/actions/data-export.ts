@@ -184,9 +184,28 @@ async function insertFromArchive(
   }
 
   // 3. Applications — include nested drafts and notes via nested create.
+  // serialNumber is a permanent identity: preserved from the archive when
+  // present, regenerated in save order for pre-p25 archives without one.
+  const applicationsBySaveOrder = [...archive.applications].sort(
+    (a, b) => new Date(a.dateSaved).getTime() - new Date(b.dateSaved).getTime()
+  );
+  const serialNumbers = new Map<string, number>();
+  let nextSerial = 1;
+  for (const application of applicationsBySaveOrder) {
+    if (application.serialNumber !== undefined) {
+      serialNumbers.set(application.id, application.serialNumber);
+    } else {
+      serialNumbers.set(application.id, nextSerial++);
+    }
+  }
+
   for (const application of archive.applications) {
     await tx.application.create({
-      data: buildApplicationCreate(application as unknown as LooseRecord) as never,
+      data: buildApplicationCreate(
+        application as unknown as LooseRecord,
+        userId,
+        serialNumbers.get(application.id) ?? 1
+      ) as never,
     });
   }
 
@@ -283,7 +302,11 @@ function buildMasterResumeCreate(input: LooseRecord, userId: string): LooseRecor
   };
 }
 
-function buildApplicationCreate(input: LooseRecord): LooseRecord {
+function buildApplicationCreate(
+  input: LooseRecord,
+  userId: string,
+  serialNumber: number
+): LooseRecord {
   const {
     resumeDrafts = [],
     coverLetterDrafts = [],
@@ -298,6 +321,8 @@ function buildApplicationCreate(input: LooseRecord): LooseRecord {
 
   return {
     ...scalarFields,
+    userId,
+    serialNumber,
     resumeDrafts: {
       create: (resumeDrafts as LooseRecord[]).map((d) => stripFk(d, 'applicationId')),
     },
