@@ -37,6 +37,7 @@ export type TrackerRow = {
 };
 
 export type TrackerExportRow = {
+  serialNumber: number;
   dateApplied: Date | null;
   companyName: string;
   jobTitle: string;
@@ -267,6 +268,7 @@ export async function getTrackerExportData(userId: string): Promise<TrackerExpor
   const applications = await db.application.findMany({
     where: { userId },
     select: {
+      serialNumber: true,
       dateApplied: true,
       status: true,
       interviewDate: true,
@@ -293,6 +295,7 @@ export async function getTrackerExportData(userId: string): Promise<TrackerExpor
   });
 
   return applications.map((app) => ({
+    serialNumber: app.serialNumber,
     dateApplied: app.dateApplied,
     companyName: app.vacancy.companyName,
     jobTitle: app.vacancy.jobTitle,
