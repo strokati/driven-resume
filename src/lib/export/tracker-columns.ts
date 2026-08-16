@@ -33,6 +33,7 @@ function fmtContact(contact: TrackerExportRow['contact']): string {
 }
 
 export const TRACKER_COLUMNS: TrackerColumn[] = [
+  { key: 'serialNumber', header: '#', format: (r) => String(r.serialNumber) },
   { key: 'dateApplied', header: 'Applied Date', format: (r) => fmtDate(r.dateApplied) },
   { key: 'companyName', header: 'Company', format: (r) => r.companyName },
   { key: 'jobTitle', header: 'Title', format: (r) => r.jobTitle },
