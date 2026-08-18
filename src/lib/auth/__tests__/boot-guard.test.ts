@@ -77,3 +77,55 @@ describe('NEXTAUTH_SECRET boot guard', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('AUTH_MODE boot guard', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    // Satisfy the NEXTAUTH_SECRET guard so failures isolate to AUTH_MODE.
+    vi.stubEnv('NEXTAUTH_SECRET', 'a'.repeat(32));
+    vi.stubEnv('NODE_ENV', 'production');
+    delete process.env.NEXT_PHASE;
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    delete process.env.NEXT_PHASE;
+  });
+
+  it('accepts explicit AUTH_MODE=none in production', async () => {
+    vi.stubEnv('AUTH_MODE', 'none');
+    await expect(import('@/lib/auth/config')).resolves.toBeDefined();
+  });
+
+  it('accepts AUTH_MODE=email_otp', async () => {
+    vi.stubEnv('AUTH_MODE', 'email_otp');
+    await expect(import('@/lib/auth/config')).resolves.toBeDefined();
+  });
+
+  it('throws when AUTH_MODE is unset in production (fail closed)', async () => {
+    delete process.env.AUTH_MODE;
+    await expect(import('@/lib/auth/config')).rejects.toThrow(/AUTH_MODE is not set/);
+  });
+
+  it('allows unset AUTH_MODE during the build phase', async () => {
+    delete process.env.AUTH_MODE;
+    vi.stubEnv('NEXT_PHASE', 'phase-production-build');
+    await expect(import('@/lib/auth/config')).resolves.toBeDefined();
+  });
+
+  it('allows unset AUTH_MODE outside production (dev/test)', async () => {
+    delete process.env.AUTH_MODE;
+    vi.stubEnv('NODE_ENV', 'development');
+    await expect(import('@/lib/auth/config')).resolves.toBeDefined();
+  });
+
+  it('throws on an unrecognized AUTH_MODE value', async () => {
+    vi.stubEnv('AUTH_MODE', 'disabled');
+    await expect(import('@/lib/auth/config')).rejects.toThrow(/AUTH_MODE="disabled" is invalid/);
+  });
+
+  it('trims whitespace before validating', async () => {
+    vi.stubEnv('AUTH_MODE', '  email_otp  ');
+    await expect(import('@/lib/auth/config')).resolves.toBeDefined();
+  });
+});
