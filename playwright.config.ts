@@ -24,5 +24,5 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },
-  globalTeardown: require.resolve('./e2e/global-teardown'),
+  globalTeardown: './e2e/global-teardown',
 });
