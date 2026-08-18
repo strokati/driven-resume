@@ -18,6 +18,30 @@ const PLACEHOLDER_SECRETS = new Set([
   '',
 ]);
 
+function assertAuthMode(): void {
+  const raw = process.env.AUTH_MODE?.trim();
+  if (raw && raw !== 'none' && raw !== 'email_otp') {
+    throw new Error(
+      `[boot] AUTH_MODE="${raw}" is invalid. Use "none" (local, no auth) or "email_otp" (self-hosted, OTP login).`
+    );
+  }
+
+  // Fail closed: an unset AUTH_MODE historically defaulted to "none" (auth
+  // disabled), which is fine on a personal machine but dangerous on an
+  // internet-facing server. The build phase is exempt — `next build` runs
+  // before deploy-time env vars exist.
+  if (
+    !raw &&
+    process.env.NODE_ENV === 'production' &&
+    process.env.NEXT_PHASE !== 'phase-production-build'
+  ) {
+    throw new Error(
+      '[boot] AUTH_MODE is not set. In production, set AUTH_MODE="email_otp" (self-hosted) ' +
+        'or "none" (local machine only). Refusing to start with auth disabled by default.'
+    );
+  }
+}
+
 function assertNextauthSecret(): void {
   // Only required for self-hosted OTP mode. In local mode (AUTH_MODE=none) auth
   // is fully disabled and the secret is never read.
@@ -39,6 +63,7 @@ function assertNextauthSecret(): void {
   }
 }
 
+assertAuthMode();
 assertNextauthSecret();
 
 const authMode = process.env.AUTH_MODE ?? 'none';
