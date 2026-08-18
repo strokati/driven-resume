@@ -144,11 +144,11 @@ export default async function ResumeEditorPage({ params }: { params: Promise<{ i
   if (!application) notFound();
 
   const [drafts, aiConfigs] = await Promise.all([
-    getResumeDrafts(applicationId),
+    getResumeDrafts(userId, applicationId),
     getAiProviderConfigs(userId),
   ]);
 
-  let activeDraft = await getActiveResumeDraft(applicationId);
+  let activeDraft = await getActiveResumeDraft(userId, applicationId);
   if (!activeDraft && drafts.length === 0) {
     const content = await buildInitialContent(userId, application.masterResumeId ?? null);
     activeDraft = await db.resumeDraft.create({
