@@ -1,8 +1,14 @@
 import { test, expect } from './fixtures/auth';
+import type { Page } from '@playwright/test';
+
+// Two "New Application" buttons render when the list is empty (page header +
+// empty state); both open the same dialog, so .first() is fine.
+const newApplicationButton = (page: Page) =>
+  page.getByRole('button', { name: /new application/i }).first();
 
 test('applications page loads and shows new application button', async ({ page }) => {
   await page.goto('/applications');
-  await expect(page.getByRole('button', { name: /new application/i })).toBeVisible({
+  await expect(newApplicationButton(page)).toBeVisible({
     timeout: 10000,
   });
 });
@@ -10,7 +16,7 @@ test('applications page loads and shows new application button', async ({ page }
 test('opens new application dialog and fills required fields', async ({ page }) => {
   await page.goto('/applications');
 
-  await page.getByRole('button', { name: /new application/i }).click();
+  await newApplicationButton(page).click();
 
   // Wait for dialog to appear
   await expect(page.getByRole('heading', { name: 'New Application' })).toBeVisible({
@@ -36,7 +42,7 @@ test('create full application through both dialog steps', async ({ page }) => {
   await page.goto('/applications');
 
   // Step 1: Open dialog and fill job details
-  await page.getByRole('button', { name: /new application/i }).click();
+  await newApplicationButton(page).click();
   await expect(page.getByRole('heading', { name: 'New Application' })).toBeVisible({
     timeout: 5000,
   });
@@ -54,6 +60,10 @@ test('create full application through both dialog steps', async ({ page }) => {
     .fill(
       'We are looking for a Staff Engineer to lead our frontend team. Requirements: React, TypeScript, 8+ years experience.'
     );
+
+  // NOTE: the dialog labels Contact Person as optional, but the schema
+  // requires contact.name when the contact object is present (it always is).
+  await page.getByLabel('Name', { exact: true }).fill('Jane Recruiter');
 
   await page.getByRole('button', { name: /create application/i }).click();
 
