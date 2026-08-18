@@ -13,8 +13,9 @@ test('master resume list page loads with header and new resume button', async ({
 test('resume detail page shows all section editors', async ({ page }) => {
   await page.goto('/master-resume');
 
-  // Open the first resume card by clicking its name (click bubbles to the card)
-  await page.getByText('International EN').first().click();
+  // A default resume ("Default") is auto-created on first load — open it.
+  // Click bubbles from the card title to the card's onClick handler.
+  await page.getByText('Default', { exact: true }).first().click();
 
   await page.waitForURL(/\/master-resume\/[^/]+$/, { timeout: 10000 });
 
