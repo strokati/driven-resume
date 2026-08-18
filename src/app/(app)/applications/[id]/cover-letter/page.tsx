@@ -22,11 +22,11 @@ export default async function CoverLetterEditorPage({
   if (!application) notFound();
 
   const [drafts, aiConfigs] = await Promise.all([
-    getCoverLetterDrafts(applicationId),
+    getCoverLetterDrafts(userId, applicationId),
     getAiProviderConfigs(userId),
   ]);
 
-  let activeDraft = await getActiveCoverLetterDraft(applicationId);
+  let activeDraft = await getActiveCoverLetterDraft(userId, applicationId);
   if (!activeDraft && drafts.length === 0) {
     activeDraft = await db.coverLetterDraft.create({
       data: {

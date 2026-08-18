@@ -354,5 +354,5 @@ export async function syncWorkExperienceFromMaster(draftId: string): Promise<Res
 export async function fetchResumeDrafts(applicationId: string): ReturnType<typeof getResumeDrafts> {
   const userId = await requireAuth();
   await assertApplicationOwned(userId, applicationId);
-  return getResumeDrafts(applicationId);
+  return getResumeDrafts(userId, applicationId);
 }
