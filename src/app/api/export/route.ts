@@ -96,7 +96,7 @@ async function handleCoverLetterExport(coverLetterDraftId: string, userId: strin
     return bufferResponse(pdfBuffer, 'application/pdf', `cover-letter-${safeName}.pdf`);
   } catch (err) {
     console.error('Cover letter export failed:', err);
-    return new Response(err instanceof Error ? err.message : 'Export failed', { status: 500 });
+    return new Response('Export failed', { status: 500 });
   }
 }
 
@@ -167,6 +167,6 @@ async function handleResumeExport(
     );
   } catch (err) {
     console.error('Export failed:', err);
-    return new Response(err instanceof Error ? err.message : 'Export failed', { status: 500 });
+    return new Response('Export failed', { status: 500 });
   }
 }
