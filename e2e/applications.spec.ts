@@ -55,6 +55,10 @@ test('create full application through both dialog steps', async ({ page }) => {
       'We are looking for a Staff Engineer to lead our frontend team. Requirements: React, TypeScript, 8+ years experience.'
     );
 
+  // NOTE: the dialog labels Contact Person as optional, but the schema
+  // requires contact.name when the contact object is present (it always is).
+  await page.getByLabel('Name', { exact: true }).fill('Jane Recruiter');
+
   await page.getByRole('button', { name: /create application/i }).click();
 
   // Should navigate to the new application detail page

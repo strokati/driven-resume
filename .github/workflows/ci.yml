@@ -105,8 +105,15 @@ jobs:
       - name: Apply database schema
         run: npx prisma migrate deploy
 
+      - name: Build app
+        run: npm run build
+
       - name: Run Playwright tests
         run: npm run e2e
+        env:
+          # Playwright's webServer runs `npm run dev` by default; against a
+          # production build the pages are precompiled and load instantly.
+          E2E_START_COMMAND: npm run start
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
