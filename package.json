@@ -94,8 +94,12 @@
   "overrides": {
     "@auth/core": "0.41.3",
     "@hono/node-server": "2.0.12",
+    "deepmerge-ts": "8.0.1",
     "docx": {
       "nanoid": "5.1.16"
+    },
+    "exceljs": {
+      "uuid": "11.1.1"
     },
     "esbuild": "0.28.1",
     "hono": "4.13.2",
