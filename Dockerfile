@@ -22,6 +22,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# prisma.config.ts resolves env('DATABASE_URL') at config load; generate
+# never connects to a database, so a placeholder satisfies it at build time.
+# Runtime containers get the real value via Coolify's environment config.
+ARG DATABASE_URL=postgresql://placeholder:placeholder@localhost:5432/placeholder
+
 # Generate Prisma client
 RUN npx prisma generate
 
